@@ -1,5 +1,4 @@
-from source.cli.RunGame import main
-
+from source.cli.run_game import main
 
 if __name__ == "__main__":
     main()

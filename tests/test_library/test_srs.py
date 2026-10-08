@@ -1,74 +1,55 @@
-# region imports
-import sys
-
-from models.commandResult import CommandResult
+from models.command_result import CommandResult
 from models.commands import Commands
-from models.starship import eDevice
-from tests.randomFactoryBuilder import RandomFactoryBuilder
+from models.starship import DeviceType
 
-sys.path.append("/pythontrek/source/library/")
-
-import source.library.factories.currentQuadrantFactory as cqf
-import source.library.factories.otherFactories as otherFact
+import source.library.factories.current_quadrant_factory as cqf
+import source.library.factories.other_factories as other_fact
 from source import gbl
 from source.library.game import game
+from tests.random_factory_builder import RandomFactoryBuilder
 
-# endregion
 
-def test_SRS_ResultsNotNull():
-    curQuad = cqf.CurrentQuadrantFactory()
-    randomFactory = (
-        RandomFactoryBuilder()
-        .WithDefaults()
-        .Build()
-    )
-    galaxy = otherFact.otherFactories.createGalaxy(randomFactory, curQuad)
-    gameVar = game.Game(galaxy, randomFactory, curQuad)
+def test_srs_results_not_null():
+    cur_quad = cqf.CurrentQuadrantFactory()
+    random_factory = RandomFactoryBuilder().with_defaults().build()
+    galaxy = other_fact.OtherFactories.create_galaxy(random_factory, cur_quad)
+    game_var = game.Game(galaxy, random_factory, cur_quad)
 
-    result = gameVar.srs()
+    result = game_var.srs()
 
     assert result is not None
 
-def test_SRS_HasContents():
-    curQuad = cqf.CurrentQuadrantFactory()
-    randomFactory = (
-        RandomFactoryBuilder()
-        .WithDefaults()
-        .Build()
-    )
-    galaxy = otherFact.otherFactories.createGalaxy(randomFactory, curQuad)
-    gameVar = game.Game(galaxy, randomFactory, curQuad)
 
-    result = gameVar.srs()
+def test_srs_has_contents():
+    cur_quad = cqf.CurrentQuadrantFactory()
+    random_factory = RandomFactoryBuilder().with_defaults().build()
+    galaxy = other_fact.OtherFactories.create_galaxy(random_factory, cur_quad)
+    game_var = game.Game(galaxy, random_factory, cur_quad)
 
-    assert result.CommandResult == CommandResult.OK
+    result = game_var.srs()
 
-def test_SRS_Damaged():
-    curQuad = cqf.CurrentQuadrantFactory()
-    randomFactory = (
-        RandomFactoryBuilder()
-        .WithDefaults()
-        .Build()
-    )
-    galaxy = otherFact.otherFactories.createGalaxy(randomFactory, curQuad)
-    gameVar = game.Game(galaxy, randomFactory, curQuad)
-    gameVar.galaxy.Starship.GetDevice(eDevice.SRS).damageLevel = -3
-    result = gameVar.srs()
+    assert result.command_result == CommandResult.OK
 
-    assert result.CommandResult == CommandResult.Damaged
-    assert result.Command == Commands.SRS
 
-def test_SRS_VerifyContents():
-    curQuad = cqf.CurrentQuadrantFactory()
-    randomFactory = (
-        RandomFactoryBuilder()
-        .WithDefaults()
-        .Build()
-    )
-    galaxy = otherFact.otherFactories.createGalaxy(randomFactory, curQuad)
-    gameVar = game.Game(galaxy, randomFactory, curQuad)
-    result = gameVar.srs()
+def test_srs_damaged():
+    cur_quad = cqf.CurrentQuadrantFactory()
+    random_factory = RandomFactoryBuilder().with_defaults().build()
+    galaxy = other_fact.OtherFactories.create_galaxy(random_factory, cur_quad)
+    game_var = game.Game(galaxy, random_factory, cur_quad)
+    game_var.galaxy.starship.get_device(DeviceType.SRS).damage_level = -3
+    result = game_var.srs()
 
-    srsRES = result.SRS.Sectors
+    assert result.command_result == CommandResult.DAMAGED
+    assert result.command == Commands.SRS
 
-    assert len(srsRES) == gbl.MAX_QUADRANT_SECTOR_XY * gbl.MAX_QUADRANT_SECTOR_XY
+
+def test_srs_verify_contents():
+    cur_quad = cqf.CurrentQuadrantFactory()
+    random_factory = RandomFactoryBuilder().with_defaults().build()
+    galaxy = other_fact.OtherFactories.create_galaxy(random_factory, cur_quad)
+    game_var = game.Game(galaxy, random_factory, cur_quad)
+    result = game_var.srs()
+
+    srs_res = result.srs.sectors
+
+    assert len(srs_res) == gbl.MAX_QUADRANT_SECTOR_XY * gbl.MAX_QUADRANT_SECTOR_XY

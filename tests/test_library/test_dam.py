@@ -1,23 +1,13 @@
-# region imports
-import sys
-from unittest.mock import MagicMock
-
-from models.commandResult import CommandResult
+from models.command_result import CommandResult
 from models.commands import Commands
-from models.starship import eDevice
-from tests.randomFactoryBuilder import RandomFactoryBuilder
+from models.starship import DeviceType
 
-sys.path.append("/pythontrek/source/library/")
-
-import source.library.factories.currentQuadrantFactory as cqf
-import source.library.factories.otherFactories as otherFact
+import source.library.factories.current_quadrant_factory as cqf
+import source.library.factories.other_factories as other_fact
 from source import gbl
+from source.library.factories.random_factory import RandomFactory
 from source.library.game import game
-from source.library.models import coord
-
-from source.library.factories.randomFactory import RandomFactory
-
-# endregion
+from tests.random_factory_builder import RandomFactoryBuilder
 
 
 def create_random_factory(*, no_enemies: bool = False, quadrant_visits: int = 1) -> RandomFactory:
@@ -25,68 +15,66 @@ def create_random_factory(*, no_enemies: bool = False, quadrant_visits: int = 1)
     if type(quadrant_visits) is not int or quadrant_visits < 1:
         raise ValueError("quadrant_visits must be a positive integer")
     return (
-        RandomFactoryBuilder().WithDefaults()
-        .SetStarshipQuadrant(2, 3)
-        .SetStarshipSector(0, 0)
-        .SetStarQuantity(2)
-        .SetEnemyChance(0 if no_enemies else 100)
-        .SetStarbaseChance(0 if no_enemies else 100)
-        .SetCoords(gbl.RCT_STAR_LOCATION, *((7, 6), (7, 7)) * quadrant_visits)
-        .SetCoords(gbl.RCT_ENEMY_LOCATION, *((0, 1), (0, 2), (0, 3)) * quadrant_visits)
-        .SetCoord(gbl.RCT_STARBASE_LOCATION, 0, 6)
-        .Build()
+        RandomFactoryBuilder()
+        .with_defaults()
+        .set_starship_quadrant(2, 3)
+        .set_starship_sector(0, 0)
+        .set_star_quantity(2)
+        .set_enemy_chance(0 if no_enemies else 100)
+        .set_starbase_chance(0 if no_enemies else 100)
+        .set_coords(gbl.RCT_STAR_LOCATION, *((7, 6), (7, 7)) * quadrant_visits)
+        .set_coords(gbl.RCT_ENEMY_LOCATION, *((0, 1), (0, 2), (0, 3)) * quadrant_visits)
+        .set_coord(gbl.RCT_STARBASE_LOCATION, 0, 6)
+        .build()
     )
+
 
 def find_device(devices, name):
     return next(d for d in devices if d.name == name)
 
 
-def test_DAM_ResultsNotNull():
-    curQuad = cqf.CurrentQuadrantFactory()
-    randomFactory = (
-        RandomFactoryBuilder()
-        .WithDefaults()
-        .Build()
-    )
-    galaxy = otherFact.otherFactories.createGalaxy(randomFactory, curQuad)
-    gameVar = game.Game(galaxy, randomFactory, curQuad)
+def test_dam_results_not_null():
+    cur_quad = cqf.CurrentQuadrantFactory()
+    random_factory = RandomFactoryBuilder().with_defaults().build()
+    galaxy = other_fact.OtherFactories.create_galaxy(random_factory, cur_quad)
+    game_var = game.Game(galaxy, random_factory, cur_quad)
 
-    result = gameVar.dam()
+    result = game_var.dam()
 
     assert result is not None
 
-def test_DAM_HasContents():
-    testMock = create_random_factory()
+
+def test_dam_has_contents():
+    test_mock = create_random_factory()
+
+    cur_quad = cqf.CurrentQuadrantFactory()
+    galaxy = other_fact.OtherFactories.create_galaxy(test_mock, cur_quad)
+    game_var = game.Game(galaxy, test_mock, cur_quad)
+
+    result = game_var.dam()
+
+    assert result.command_result == CommandResult.OK
 
 
-    curQuad = cqf.CurrentQuadrantFactory()
-    galaxy = otherFact.otherFactories.createGalaxy(testMock, curQuad)
-    gameVar = game.Game(galaxy, testMock, curQuad)
+def test_dam_verify_contents():
+    test_mock = create_random_factory()
 
-    result = gameVar.dam()
+    cur_quad = cqf.CurrentQuadrantFactory()
+    galaxy = other_fact.OtherFactories.create_galaxy(test_mock, cur_quad)
+    game_var = game.Game(galaxy, test_mock, cur_quad)
+    game_var.galaxy.starship.get_device(DeviceType.LRS).damage_level = -2
+    game_var.galaxy.starship.get_device(DeviceType.SRS).damage_level = -1
+    game_var.galaxy.starship.get_device(DeviceType.TOR).damage_level = -1.5
 
-    assert result.CommandResult == CommandResult.OK
+    result = game_var.dam()
 
-def test_DAM_VerifyContents():
-    testMock = create_random_factory()
+    assert result.command_result == CommandResult.OK
+    assert result.command == Commands.DAM
 
+    dev1 = find_device(result.dam.devices, "SRS")
+    dev2 = find_device(result.dam.devices, "LRS")
+    dev3 = find_device(result.dam.devices, "TOR")
 
-    curQuad = cqf.CurrentQuadrantFactory()
-    galaxy = otherFact.otherFactories.createGalaxy(testMock, curQuad)
-    gameVar = game.Game(galaxy, testMock, curQuad)
-    gameVar.galaxy.Starship.GetDevice(eDevice.LRS).damageLevel = -2
-    gameVar.galaxy.Starship.GetDevice(eDevice.SRS).damageLevel = -1
-    gameVar.galaxy.Starship.GetDevice(eDevice.TOR).damageLevel = -1.5
-
-    result = gameVar.dam()
-
-    assert result.CommandResult == CommandResult.OK
-    assert result.Command == Commands.DAM
-
-    dev1 = find_device(result.DAM.Devices, "SRS")
-    dev2 = find_device(result.DAM.Devices, "LRS")
-    dev3 = find_device(result.DAM.Devices, "TOR")
-
-    assert dev1.damageLevel == -1
-    assert dev2.damageLevel == -2
-    assert dev3.damageLevel == -1.5
+    assert dev1.damage_level == -1
+    assert dev2.damage_level == -2
+    assert dev3.damage_level == -1.5

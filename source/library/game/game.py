@@ -1,766 +1,852 @@
-# region imports
 import math
-import sys
 
 import gbl
-from factories import currentQuadrantFactory, randomFactory
-from factories.otherFactories import otherFactories
-from models import enemyFired
-from models.commandResult import CommandResult
+from factories import current_quadrant_factory, random_factory
+from factories.other_factories import OtherFactories
+from models import enemy_fired
+from models.command_result import CommandResult
 from models.commands import Commands
 from models.coord import Coord
 from models.device import Device
-from models.directionToEnemy import DirectionToEnemy
-from models.dockingStatus import DockingStatus
-from models.enemyFired import EnemyFired
-from models.enemyMoved import EnemyMoved
-from models.starship import eDevice
+from models.direction_to_enemy import DirectionToEnemy
+from models.docking_status import DockingStatus
+from models.enemy_fired import EnemyFired
+from models.enemy_moved import EnemyMoved
 from models.galaxy import Galaxy
-from models.gameStatus import GameStatus
-from models.navMessage import NavMessage
-from models.objectHit import ObjectHit
-from models.objectHitReport import ObjectHitReport
+from models.game_status import GameStatus
+from models.nav_message import NavMessage
+from models.object_hit import ObjectHit
+from models.object_hit_report import ObjectHitReport
 from models.quadrant import Quadrant
 from models.result import (
-    COM_NAV,
-    COM_REC,
-    COM_STA,
-    COM_STB,
-    COM_TOR,
-    DAM,
-    LRS,
-    NAV,
-    LAS,
-    SHE,
-    SRS,
-    TOR,
+    ComNavResult,
+    ComRecResult,
+    ComStaResult,
+    ComStbResult,
+    ComTorResult,
+    DamResult,
+    LasResult,
+    LrsResult,
     MaintResult,
+    NavResult,
     Result,
+    SheResult,
+    SrsResult,
+    TorResult,
 )
 from models.sector import Sector
-from models.starbaseRepairs import StarbaseRepairs
-from utils.calculationUtilities import calculationUtils
-from utils.detectObject import DetectObject
-
-sys.path.append("/pythontrek/source/library/")
-sys.path.append("/pythontrek/source/models/")
-# endregion
+from models.starbase_repairs import StarbaseRepairs
+from models.starship import DeviceType
+from utils.calculation_utilities import CalculationUtils
+from utils.detect_object import DetectObject
 
 
 class Game:
-    skipEnemyMove: bool
-    forceEnemyMove: bool
-    preventEnemyFire: bool = False
+    skip_enemy_move: bool
+    force_enemy_move: bool
+    prevent_enemy_fire: bool = False
 
-    def __init__(self, galaxy: Galaxy, randFact: randomFactory.RandomFactory, currentQuadFact: currentQuadrantFactory.CurrentQuadrantFactory) -> None:
+    def __init__(
+        self,
+        galaxy: Galaxy,
+        rand_fact: random_factory.RandomFactory,
+        current_quad_fact: current_quadrant_factory.CurrentQuadrantFactory,
+    ) -> None:
         self.galaxy = galaxy
-        self.randomFactory = randFact
-        self.currentQuadrantFactory = currentQuadrantFactory
-        self.skipEnemyMove = False
-        self.forceEnemyMove = False
+        self.random_factory = rand_fact
+        self.current_quadrant_factory = current_quadrant_factory
+        self.skip_enemy_move = False
+        self.force_enemy_move = False
 
-    # region commands
     def srs(self) -> Result:
-        if self.getDamageLevel(eDevice.SRS) < 0:
+        if self.get_damage_level(DeviceType.SRS) < 0:
             res = Result()
-            res.CommandResult = CommandResult.Damaged
-            res.Command = Commands.SRS
+            res.command_result = CommandResult.DAMAGED
+            res.command = Commands.SRS
             return res
 
         res = Result()
-        res.CommandResult = CommandResult.OK
-        res.Command = Commands.SRS
-        res.SRS = SRS(self.galaxy.CurrentQuadrant.sectors)
+        res.command_result = CommandResult.OK
+        res.command = Commands.SRS
+        res.srs = SrsResult(self.galaxy.current_quadrant.sectors)
         return res
 
     def lrs(self) -> Result:
-        if self.getDamageLevel(eDevice.LRS) < 0:
+        if self.get_damage_level(DeviceType.LRS) < 0:
             res = Result()
-            res.CommandResult = CommandResult.Damaged
-            res.Command = Commands.LRS
+            res.command_result = CommandResult.DAMAGED
+            res.command = Commands.LRS
             return res
 
-        # quadCoord = self.galaxy.CurrentQuadrant.coord
-        lowerX = self.galaxy.CurrentQuadrant.coord.x - gbl.LRS_RANGE
-        upperX = self.galaxy.CurrentQuadrant.coord.x + gbl.LRS_RANGE
+        lower_x = self.galaxy.current_quadrant.coord.x - gbl.LRS_RANGE
+        upper_x = self.galaxy.current_quadrant.coord.x + gbl.LRS_RANGE
 
-        lowerY = self.galaxy.CurrentQuadrant.coord.y - gbl.LRS_RANGE
-        upperY = self.galaxy.CurrentQuadrant.coord.y + gbl.LRS_RANGE
-
-        # print(f"Current x,y: {quadCoord.ToString()}")
-        # print(f"lowerX:{lowerX}")
-        # print(f"upperX:{upperX}")
-        # print(f"lowerY:{lowerY}")
-        # print(f"upperY:{upperY}")
+        lower_y = self.galaxy.current_quadrant.coord.y - gbl.LRS_RANGE
+        upper_y = self.galaxy.current_quadrant.coord.y + gbl.LRS_RANGE
 
         max_coord = gbl.MAX_QUADRANT_SECTOR_XY - 1
 
-        lowerX = max(0, lowerX)
-        upperX = min(max_coord, upperX)
-        lowerY = max(0, lowerY)
-        upperY = min(max_coord, upperY)
-
+        lower_x = max(0, lower_x)
+        upper_x = min(max_coord, upper_x)
+        lower_y = max(0, lower_y)
+        upper_y = min(max_coord, upper_y)
 
         quadrants = []
-        for x in range(lowerX, upperX + 1):
-            for y in range(lowerY, upperY + 1):
-                # print(f"x:{x} y:{y}")
-                quad = self.galaxy.GetQuadrant(x,y)
-                quad.HasBeenExplored = True
+        for x in range(lower_x, upper_x + 1):
+            for y in range(lower_y, upper_y + 1):
+                quad = self.galaxy.get_quadrant(x, y)
+                quad.has_been_explored = True
                 quadrants.append(quad)
 
         result = Result()
-        result.LRS = LRS(quadrants)
-        result.Command = Commands.LRS
-        result.CommandResult = CommandResult.OK
+        result.lrs = LrsResult(quadrants)
+        result.command = Commands.LRS
+        result.command_result = CommandResult.OK
 
         return result
 
     def com_rec(self) -> Result:
-        if self.getDamageLevel(eDevice.COM) < 0:
+        if self.get_damage_level(DeviceType.COM) < 0:
             res = Result()
-            res.CommandResult = CommandResult.Damaged
-            res.Command = Commands.COM_REC
+            res.command_result = CommandResult.DAMAGED
+            res.command = Commands.COM_REC
             return res
 
         result = Result()
-        result.COM_REC = COM_REC(self.galaxy.GetExploredQuadrant())
-        result.Command = Commands.COM_REC
-        result.CommandResult = CommandResult.OK
+        result.com_rec = ComRecResult(self.galaxy.get_explored_quadrant())
+        result.command = Commands.COM_REC
+        result.command_result = CommandResult.OK
 
         return result
 
     def com_sta(self) -> Result:
-        if self.getDamageLevel(eDevice.COM) < 0:
+        if self.get_damage_level(DeviceType.COM) < 0:
             res = Result()
-            res.CommandResult = CommandResult.Damaged
-            res.Command = Commands.COM_STA
+            res.command_result = CommandResult.DAMAGED
+            res.command = Commands.COM_STA
             return res
 
-        missionTime = self.galaxy.MissionTime
-        quadCoord = self.galaxy.CurrentQuadrant.coord
-        entSector = self.galaxy.CurrentQuadrant.GetSectorByContents(gbl.SECTOR_STARSHIP)
+        mission_time = self.galaxy.mission_time
+        quad_coord = self.galaxy.current_quadrant.coord
+        ent_sector = self.galaxy.current_quadrant.get_sector_by_contents(gbl.SECTOR_STARSHIP)
 
-        if entSector is None:
+        if ent_sector is None:
             res = Result()
-            res.CommandResult = CommandResult.Error
-            res.Command = Commands.COM_STA
+            res.command_result = CommandResult.ERROR
+            res.command = Commands.COM_STA
             return res
 
-        damagedDevices = self.galaxy.Starship.GetDamgedDevices()
-        enemiesRemain = otherFactories.getEnemiesRemaining(self.galaxy)
-        starbasesRemaing = self.galaxy.GetStarbasesRemaining()
-        energyRemaing = self.galaxy.Starship.energyLevel
-        shieldLevel = self.galaxy.Starship.shieldLevel
-        torpRemain = self.galaxy.Starship.torpsRemain
-        isDocked = self.galaxy.Starship.isDocked
-        missionTimeDeadline = self.galaxy.MissionTimeDeadline
+        damaged_devices = self.galaxy.starship.get_damaged_devices()
+        enemies_remain = OtherFactories.get_enemies_remaining(self.galaxy)
+        starbases_remaing = self.galaxy.get_starbases_remaining()
+        energy_remaing = self.galaxy.starship.energy_level
+        shield_level = self.galaxy.starship.shield_level
+        torp_remain = self.galaxy.starship.torps_remain
+        is_docked = self.galaxy.starship.is_docked
+        mission_time_deadline = self.galaxy.mission_time_deadline
 
-        comsta = COM_STA(missionTime, quadCoord, entSector.coord, damagedDevices, enemiesRemain, starbasesRemaing,
-                         energyRemaing, shieldLevel, torpRemain, isDocked, missionTimeDeadline)
+        comsta = ComStaResult(
+            mission_time,
+            quad_coord,
+            ent_sector.coord,
+            damaged_devices,
+            enemies_remain,
+            starbases_remaing,
+            energy_remaing,
+            shield_level,
+            torp_remain,
+            is_docked,
+            mission_time_deadline,
+        )
 
         result = Result()
-        result.COM_STA = comsta
-        result.Command = Commands.COM_STA
-        result.CommandResult = CommandResult.OK
+        result.com_sta = comsta
+        result.command = Commands.COM_STA
+        result.command_result = CommandResult.OK
 
         return result
 
     def com_stb(self) -> Result:
-        if self.getDamageLevel(eDevice.COM) < 0:
+        if self.get_damage_level(DeviceType.COM) < 0:
             res = Result()
-            res.CommandResult = CommandResult.Damaged
-            res.Command = Commands.COM_STB
+            res.command_result = CommandResult.DAMAGED
+            res.command = Commands.COM_STB
             return res
 
-        starbaseSector = self.galaxy.CurrentQuadrant.GetSectorByContents(gbl.SECTOR_STARBASE)
-        starshipSector = self.galaxy.CurrentQuadrant.GetSectorByContents(gbl.SECTOR_STARSHIP)
+        starbase_sector = self.galaxy.current_quadrant.get_sector_by_contents(gbl.SECTOR_STARBASE)
+        starship_sector = self.galaxy.current_quadrant.get_sector_by_contents(gbl.SECTOR_STARSHIP)
 
-        if starbaseSector == None:
+        if starbase_sector is None:
             res = Result()
-            res.CommandResult = CommandResult.CPU_STB_No_Starbase_Present
-            res.Command = Commands.COM_STB
+            res.command_result = CommandResult.CPU_STB_NO_STARBASE_PRESENT
+            res.command = Commands.COM_STB
             return res
-        if starshipSector == None:
+        if starship_sector is None:
             raise RuntimeError("Starship Sector was none")
-        
-        DIR = calculationUtils.GetDirection(starshipSector.coord, starbaseSector.coord)
-        DIST = calculationUtils.GetDistance(starshipSector.coord, starbaseSector.coord)
+
+        dir = CalculationUtils.get_direction(starship_sector.coord, starbase_sector.coord)
+        dist = CalculationUtils.get_distance(starship_sector.coord, starbase_sector.coord)
 
         res = Result()
-        res.COM_STB = COM_STB(DIR, DIST, starbaseSector.coord)
+        res.com_stb = ComStbResult(dir, dist, starbase_sector.coord)
 
-        res.CommandResult = CommandResult.OK
-        res.Command = Commands.COM_STB
+        res.command_result = CommandResult.OK
+        res.command = Commands.COM_STB
         return res
 
     def com_tor(self) -> Result:
-        if self.getDamageLevel(eDevice.COM) < 0:
+        if self.get_damage_level(DeviceType.COM) < 0:
             res = Result()
-            res.CommandResult = CommandResult.Damaged
-            res.Command = Commands.COM_TOR
+            res.command_result = CommandResult.DAMAGED
+            res.command = Commands.COM_TOR
             return res
 
-        starshipSector = self.galaxy.CurrentQuadrant.GetSectorByContents(gbl.SECTOR_STARSHIP)
+        starship_sector = self.galaxy.current_quadrant.get_sector_by_contents(gbl.SECTOR_STARSHIP)
 
-        enemySectors = self.galaxy.CurrentQuadrant.GetEnemySectors()
-        if enemySectors is None:
+        enemy_sectors = self.galaxy.current_quadrant.get_enemy_sectors()
+        if enemy_sectors is None:
             res = Result()
-            res.CommandResult = CommandResult.No_Enemies_Present
-            res.Command = Commands.COM_TOR
+            res.command_result = CommandResult.NO_ENEMIES_PRESENT
+            res.command = Commands.COM_TOR
             return res
 
-        enemyDirList = []
-        for enemySector in enemySectors:
-            if starshipSector == None:
-                raise RuntimeError("Starship Sector was none") 
-                       
-            dir = calculationUtils.GetDirection(starshipSector.coord, enemySector.coord)
-            dist = calculationUtils.GetDistance(starshipSector.coord, enemySector.coord)
-            dirToEnemy = DirectionToEnemy(dir, dist, enemySector.coord)
-            enemyDirList.append(dirToEnemy)
+        enemy_dir_list = []
+        for enemy_sector in enemy_sectors:
+            if starship_sector is None:
+                raise RuntimeError("Starship Sector was none")
+
+            dir = CalculationUtils.get_direction(starship_sector.coord, enemy_sector.coord)
+            dist = CalculationUtils.get_distance(starship_sector.coord, enemy_sector.coord)
+            dir_to_enemy = DirectionToEnemy(dir, dist, enemy_sector.coord)
+            enemy_dir_list.append(dir_to_enemy)
 
         res = Result()
-        res.CommandResult = CommandResult.OK
-        res.Command = Commands.COM_TOR
-        res.COM_TOR = COM_TOR(enemyDirList)
+        res.command_result = CommandResult.OK
+        res.command = Commands.COM_TOR
+        res.com_tor = ComTorResult(enemy_dir_list)
         return res
 
-    def com_nav(self, destQuadrant: Coord, destSector: Coord) -> Result:
-        if self.getDamageLevel(eDevice.COM) < 0:
+    def com_nav(self, dest_quadrant: Coord, dest_sector: Coord) -> Result:
+        if self.get_damage_level(DeviceType.COM) < 0:
             res = Result()
-            res.CommandResult = CommandResult.Damaged
-            res.Command = Commands.COM_NAV
+            res.command_result = CommandResult.DAMAGED
+            res.command = Commands.COM_NAV
             return res
 
-        starshipSector = self.galaxy.CurrentQuadrant.GetSectorByContents(gbl.SECTOR_STARSHIP)
-        currentQuadrantCoord = self.galaxy.CurrentQuadrant.coord
+        starship_sector = self.galaxy.current_quadrant.get_sector_by_contents(gbl.SECTOR_STARSHIP)
+        current_quadrant_coord = self.galaxy.current_quadrant.coord
 
-        if starshipSector == None:
+        if starship_sector is None:
             raise RuntimeError("Starship Sector was none")
-        
-        startUX = calculationUtils.QS2Univ(currentQuadrantCoord.x, starshipSector.coord.x)
-        startUY = calculationUtils.QS2Univ(currentQuadrantCoord.y, starshipSector.coord.y)
-        targetUX = calculationUtils.QS2Univ(destQuadrant.x, destSector.x)
-        targetUY = calculationUtils.QS2Univ(destQuadrant.y, destSector.y)
 
-        dir = calculationUtils.GetDirection(Coord(startUX, startUY), Coord(targetUX, targetUY))
-        dist = calculationUtils.GetDistance(Coord(startUX, startUY), Coord(targetUX, targetUY)) / 8
+        start_ux = CalculationUtils.qs2_univ(current_quadrant_coord.x, starship_sector.coord.x)
+        start_uy = CalculationUtils.qs2_univ(current_quadrant_coord.y, starship_sector.coord.y)
+        target_ux = CalculationUtils.qs2_univ(dest_quadrant.x, dest_sector.x)
+        target_uy = CalculationUtils.qs2_univ(dest_quadrant.y, dest_sector.y)
+
+        dir = CalculationUtils.get_direction(Coord(start_ux, start_uy), Coord(target_ux, target_uy))
+        dist = (
+            CalculationUtils.get_distance(Coord(start_ux, start_uy), Coord(target_ux, target_uy))
+            / 8
+        )
 
         res = Result()
-        res.CommandResult = CommandResult.OK
-        res.Command = Commands.COM_NAV
-        res.COM_NAV = COM_NAV(dir, dist)
+        res.command_result = CommandResult.OK
+        res.command = Commands.COM_NAV
+        res.com_nav = ComNavResult(dir, dist)
         return res
 
     def dam(self) -> Result:
-        devices = self.galaxy.Starship.GetDamgedDevices()
+        devices = self.galaxy.starship.get_damaged_devices()
         res = Result()
         if len(devices) == 0:
-            res.DAM = DAM([])
+            res.dam = DamResult([])
         else:
-            res.DAM = DAM(devices)
-        res.CommandResult = CommandResult.OK
-        res.Command = Commands.DAM
+            res.dam = DamResult(devices)
+        res.command_result = CommandResult.OK
+        res.command = Commands.DAM
         return res
 
-    def she(self, newShieldLevel: int) -> Result:
-        if self.getDamageLevel(eDevice.SHE) < 0:
+    def she(self, new_shield_level: int) -> Result:
+        if self.get_damage_level(DeviceType.SHE) < 0:
             res = Result()
-            res.CommandResult = CommandResult.Damaged
-            res.Command = Commands.SHE
+            res.command_result = CommandResult.DAMAGED
+            res.command = Commands.SHE
             return res
 
-        if newShieldLevel < 0:
+        if new_shield_level < 0:
             res = Result()
-            res.CommandResult = CommandResult.Error
-            res.Command = Commands.SHE
-            data = SHE(gbl.SHE_INVALIDAMOUNT)
-            res.SHE = data
-            return res            
-
-        currentEnergyLevel = self.galaxy.Starship.energyLevel + self.galaxy.Starship.shieldLevel
-        if (newShieldLevel > currentEnergyLevel):
-            res = Result()
-            res.CommandResult = CommandResult.Error
-            res.Command = Commands.SHE
-            data = SHE(gbl.SHE_ERRORMESSAGE)
-            res.SHE = data
+            res.command_result = CommandResult.ERROR
+            res.command = Commands.SHE
+            data = SheResult(gbl.SHE_INVALIDAMOUNT)
+            res.she = data
             return res
 
-        self.galaxy.Starship.energyLevel = currentEnergyLevel - newShieldLevel
-        self.galaxy.Starship.shieldLevel = newShieldLevel
+        current_energy_level = self.galaxy.starship.energy_level + self.galaxy.starship.shield_level
+        if new_shield_level > current_energy_level:
+            res = Result()
+            res.command_result = CommandResult.ERROR
+            res.command = Commands.SHE
+            data = SheResult(gbl.SHE_ERRORMESSAGE)
+            res.she = data
+            return res
+
+        self.galaxy.starship.energy_level = current_energy_level - new_shield_level
+        self.galaxy.starship.shield_level = new_shield_level
         res = Result()
-        res.CommandResult = CommandResult.OK
-        res.Command = Commands.SHE
-        res.SHE = SHE("")
+        res.command_result = CommandResult.OK
+        res.command = Commands.SHE
+        res.she = SheResult("")
         return res
 
     def tor(self, dir: float) -> Result:
-        if self.getDamageLevel(eDevice.TOR) < 0:
+        if self.get_damage_level(DeviceType.TOR) < 0:
             res = Result()
-            res.CommandResult = CommandResult.Damaged
-            res.Command = Commands.TOR
+            res.command_result = CommandResult.DAMAGED
+            res.command = Commands.TOR
             return res
 
-        enemySectors = self.galaxy.CurrentQuadrant.GetEnemySectors()
-        if enemySectors is None or  len(enemySectors) == 0:
+        enemy_sectors = self.galaxy.current_quadrant.get_enemy_sectors()
+        if enemy_sectors is None or len(enemy_sectors) == 0:
             res = Result()
-            res.CommandResult = CommandResult.No_Enemies_Present
-            res.Command = Commands.TOR
+            res.command_result = CommandResult.NO_ENEMIES_PRESENT
+            res.command = Commands.TOR
             return res
 
-        if self.galaxy.Starship.torpsRemain <= 0:
+        if self.galaxy.starship.torps_remain <= 0:
             res = Result()
-            res.CommandResult = CommandResult.InsufficientInventory
-            res.Command = Commands.TOR
+            res.command_result = CommandResult.INSUFFICIENT_INVENTORY
+            res.command = Commands.TOR
             return res
 
-        self.galaxy.Starship.UseTorpedo()
+        self.galaxy.starship.use_torpedo()
 
-        starshipSector = self.galaxy.GetStarshipSector()
-        CFO = DetectObject.detectObjectNoDist(self.galaxy.CurrentQuadrant, starshipSector.coord, False, dir)
+        starship_sector = self.galaxy.get_starship_sector()
+        cfo = DetectObject.detect_object_no_dist(
+            self.galaxy.current_quadrant, starship_sector.coord, False, dir
+        )
 
-        if CFO.object == gbl.SECTOR_EMPTY:
+        if cfo.object == gbl.SECTOR_EMPTY:
             res = Result()
-            res.CommandResult = CommandResult.TOR_Missed
-            res.Command = Commands.TOR
+            res.command_result = CommandResult.TOR_MISSED
+            res.command = Commands.TOR
             return res
 
-        targetSector = self.galaxy.CurrentQuadrant.GetSectorByCoord(CFO.finalCoord)
-        starshipQuadrant = self.galaxy.GetQuadrantByCoord(self.galaxy.CurrentQuadrant.coord)
+        target_sector = self.galaxy.current_quadrant.get_sector_by_coord(cfo.final_coord)
+        starship_quadrant = self.galaxy.get_quadrant_by_coord(self.galaxy.current_quadrant.coord)
 
-        if CFO.object == gbl.SECTOR_ENEMY:
-            return self.tor_enemy(targetSector, starshipQuadrant)
+        if cfo.object == gbl.SECTOR_ENEMY:
+            return self.tor_enemy(target_sector, starship_quadrant)
 
-        if CFO.object == gbl.SECTOR_STARBASE:
-            return self.tor_starbase(targetSector, starshipQuadrant)
+        if cfo.object == gbl.SECTOR_STARBASE:
+            return self.tor_starbase(target_sector, starship_quadrant)
 
-        if CFO.object == gbl.SECTOR_STAR:
-            return self.tor_star(targetSector, starshipQuadrant)
-
+        if cfo.object == gbl.SECTOR_STAR:
+            return self.tor_star(target_sector, starship_quadrant)
 
         res = Result()
-        res.CommandResult = CommandResult.Error
-        res.Command = Commands.TOR
+        res.command_result = CommandResult.ERROR
+        res.command = Commands.TOR
 
         return res
-    def tor_enemy(self, targetSector: Sector, entQuadrant: Quadrant) -> Result:
-        targetSector.sectorContents.sectorContents = gbl.SECTOR_EMPTY
-        targetSector.enemy = None
-        entQuadrant.NumEnemies -= 1
-        ohr = ObjectHitReport(ObjectHit.Enemy, True, targetSector.coord, -1, -1, False, False)
+
+    def tor_enemy(self, target_sector: Sector, ent_quadrant: Quadrant) -> Result:
+        target_sector.sector_contents.sector_contents = gbl.SECTOR_EMPTY
+        target_sector.enemy = None
+        ent_quadrant.num_enemies -= 1
+        ohr = ObjectHitReport(ObjectHit.ENEMY, True, target_sector.coord, -1, -1, False, False)
         res = Result()
-        res.CommandResult = CommandResult.OK
-        res.Command = Commands.TOR
-        res.TOR = TOR(ohr)
+        res.command_result = CommandResult.OK
+        res.command = Commands.TOR
+        res.tor = TorResult(ohr)
         return res
-    def tor_starbase(self, targetSector: Sector, entQuadrant: Quadrant) -> Result:
-        targetSector.sectorContents.sectorContents = gbl.SECTOR_EMPTY
-        entQuadrant.HasStarBase = False
-        ohr = ObjectHitReport(ObjectHit.Starbase, True, targetSector.coord, -1, -1, False, False)
+
+    def tor_starbase(self, target_sector: Sector, ent_quadrant: Quadrant) -> Result:
+        target_sector.sector_contents.sector_contents = gbl.SECTOR_EMPTY
+        ent_quadrant.has_star_base = False
+        ohr = ObjectHitReport(ObjectHit.STARBASE, True, target_sector.coord, -1, -1, False, False)
         res = Result()
-        res.CommandResult = CommandResult.OK
-        res.Command = Commands.TOR
-        res.TOR = TOR(ohr)
+        res.command_result = CommandResult.OK
+        res.command = Commands.TOR
+        res.tor = TorResult(ohr)
         return res
-    def tor_star(self, targetSector: Sector, entQuadrant: Quadrant) -> Result:
-        randChance = self.randomFactory.GetRandomInteger(gbl.RIT_STAR_DESTROYED_CHANCE)
-        if randChance > gbl.STAR_DESTROYED_CHANCE:
-            targetSector.sectorContents.sectorContents = gbl.SECTOR_EMPTY
-            entQuadrant.NumStars -= 1
-            starDestroyed = True
-            starSurvived = False
+
+    def tor_star(self, target_sector: Sector, ent_quadrant: Quadrant) -> Result:
+        rand_chance = self.random_factory.get_random_integer(gbl.RIT_STAR_DESTROYED_CHANCE)
+        if rand_chance > gbl.STAR_DESTROYED_CHANCE:
+            target_sector.sector_contents.sector_contents = gbl.SECTOR_EMPTY
+            ent_quadrant.num_stars -= 1
+            star_destroyed = True
+            star_survived = False
         else:
-            starDestroyed = False
-            starSurvived = True
+            star_destroyed = False
+            star_survived = True
 
-        ohr = ObjectHitReport(ObjectHit.Star, starDestroyed, targetSector.coord, -1, -1, False, starSurvived)
+        ohr = ObjectHitReport(
+            ObjectHit.STAR, star_destroyed, target_sector.coord, -1, -1, False, star_survived
+        )
         res = Result()
-        res.CommandResult = CommandResult.OK
-        res.Command = Commands.TOR
-        res.TOR = TOR(ohr)
+        res.command_result = CommandResult.OK
+        res.command = Commands.TOR
+        res.tor = TorResult(ohr)
         return res
 
     def las(self, energy: int) -> Result:
-        if self.getDamageLevel(eDevice.LAS) < 0:
+        if self.get_damage_level(DeviceType.LAS) < 0:
             res = Result()
-            res.CommandResult = CommandResult.Damaged
-            res.Command = Commands.LAS
+            res.command_result = CommandResult.DAMAGED
+            res.command = Commands.LAS
             return res
 
         if energy < 0:
             res = Result()
-            res.CommandResult = CommandResult.Error
-            res.Command = Commands.SHE
-            data = SHE(gbl.LAS_INVALIDAMOUNT)
-            res.SHE = data
-            return res           
-
-        if self.galaxy.Starship.energyLevel < energy:
-            res = Result()
-            res.CommandResult = CommandResult.InsufficientInventory
-            res.Command = Commands.LAS
+            res.command_result = CommandResult.ERROR
+            res.command = Commands.SHE
+            data = SheResult(gbl.LAS_INVALIDAMOUNT)
+            res.she = data
             return res
 
-        enemySectors = self.galaxy.CurrentQuadrant.GetEnemySectors()
-        if enemySectors is None or len(enemySectors) == 0:
+        if self.galaxy.starship.energy_level < energy:
             res = Result()
-            res.CommandResult = CommandResult.No_Enemies_Present
-            res.Command = Commands.LAS
+            res.command_result = CommandResult.INSUFFICIENT_INVENTORY
+            res.command = Commands.LAS
             return res
 
-        starshipQuadrant = self.galaxy.GetQuadrantByCoord(self.galaxy.CurrentQuadrant.coord)
-        starshipSector = self.galaxy.GetStarshipSector()
-        enemyHitReports = []
+        enemy_sectors = self.galaxy.current_quadrant.get_enemy_sectors()
+        if enemy_sectors is None or len(enemy_sectors) == 0:
+            res = Result()
+            res.command_result = CommandResult.NO_ENEMIES_PRESENT
+            res.command = Commands.LAS
+            return res
 
-        self.galaxy.Starship.energyLevel -= energy
+        starship_quadrant = self.galaxy.get_quadrant_by_coord(self.galaxy.current_quadrant.coord)
+        starship_sector = self.galaxy.get_starship_sector()
+        enemy_hit_reports = []
 
-        for enemySector in enemySectors:
-            target_enemy = enemySector.enemy
+        self.galaxy.starship.energy_level -= energy
+
+        for enemy_sector in enemy_sectors:
+            target_enemy = enemy_sector.enemy
 
             if target_enemy is None:
-                raise RuntimeError(f"Sector {enemySector.coord.ToString()} is marked as enemy but has no enemy object")
+                raise RuntimeError(
+                    f"Sector {enemy_sector.coord.to_string()} is marked as enemy but has no enemy object"
+                )
 
-            if target_enemy.shieldLevel is None:
-                target_enemy.shieldLevel = 0
+            if target_enemy.shield_level is None:
+                target_enemy.shield_level = 0
 
-                
-            if self.getDamageLevel(eDevice.COM) < 0:
-                randInt = self.randomFactory.GetRandomInteger(gbl.RIT_LASER_MISS_CHANCE)
-                if randInt > gbl.LASER_MISS_CHANCE_CPU_DOWN:
-
-
-
-                    ohr = ObjectHitReport(ObjectHit.Nothing, False, enemySector.coord, target_enemy.shieldLevel, 0, True, False)
-                    enemyHitReports.append(ohr)
+            if self.get_damage_level(DeviceType.COM) < 0:
+                rand_int = self.random_factory.get_random_integer(gbl.RIT_LASER_MISS_CHANCE)
+                if rand_int > gbl.LASER_MISS_CHANCE_CPU_DOWN:
+                    ohr = ObjectHitReport(
+                        ObjectHit.NOTHING,
+                        False,
+                        enemy_sector.coord,
+                        target_enemy.shield_level,
+                        0,
+                        True,
+                        False,
+                    )
+                    enemy_hit_reports.append(ohr)
                     continue
 
-            distToEnemy = calculationUtils.GetDistance(starshipSector.coord, enemySector.coord)
-            energyHitEnemy = calculationUtils.GetEnemyShieldHit(len(enemySectors), energy, distToEnemy, gbl.SECTOR_TO_ENERGY_CONV)
-            wasDestroyed = self.galaxy.CurrentQuadrant.EnemyHit(enemySector.coord, energyHitEnemy)
-            if wasDestroyed:
-                enemySector.sectorContents.sectorContents = gbl.SECTOR_EMPTY
-                enemySector.enemy = None
-                starshipQuadrant.NumEnemies -= 1
-                ohr = ObjectHitReport(ObjectHit.Enemy, True, enemySector.coord, 0, 0, False, False)
-                enemyHitReports.append(ohr)
+            dist_to_enemy = CalculationUtils.get_distance(starship_sector.coord, enemy_sector.coord)
+            energy_hit_enemy = CalculationUtils.get_enemy_shield_hit(
+                len(enemy_sectors), energy, dist_to_enemy, gbl.SECTOR_TO_ENERGY_CONV
+            )
+            was_destroyed = self.galaxy.current_quadrant.enemy_hit(
+                enemy_sector.coord, energy_hit_enemy
+            )
+            if was_destroyed:
+                enemy_sector.sector_contents.sector_contents = gbl.SECTOR_EMPTY
+                enemy_sector.enemy = None
+                starship_quadrant.num_enemies -= 1
+                ohr = ObjectHitReport(ObjectHit.ENEMY, True, enemy_sector.coord, 0, 0, False, False)
+                enemy_hit_reports.append(ohr)
                 continue
             else:
-                ohr = ObjectHitReport(ObjectHit.Enemy, False, enemySector.coord, target_enemy.shieldLevel, energyHitEnemy, False, False)
-                enemyHitReports.append(ohr)
+                ohr = ObjectHitReport(
+                    ObjectHit.ENEMY,
+                    False,
+                    enemy_sector.coord,
+                    target_enemy.shield_level,
+                    energy_hit_enemy,
+                    False,
+                    False,
+                )
+                enemy_hit_reports.append(ohr)
                 continue
 
         res = Result()
-        res.LAS = LAS(enemyHitReports)
-        res.CommandResult = CommandResult.OK
-        res.Command = Commands.LAS
+        res.las = LasResult(enemy_hit_reports)
+        res.command_result = CommandResult.OK
+        res.command = Commands.LAS
         return res
 
     def nav(self, dir: float, dist: float) -> Result:
         dir = round(dir, 1)
         dist = round(dist, 1)
 
-
         if dir < 0.1 or dir >= 9:
             res = Result()
-            res.CommandResult = CommandResult.Error
-            res.Command = Commands.NAV
-            res.NAV = NAV(NavMessage.InvalidDIR, -1)
+            res.command_result = CommandResult.ERROR
+            res.command = Commands.NAV
+            res.nav = NavResult(NavMessage.INVALID_DIR, -1)
             return res
 
         if dist < 0.1 or dist > 8:
             res = Result()
-            res.CommandResult = CommandResult.Error
-            res.Command = Commands.NAV
-            res.NAV = NAV(NavMessage.InvalidDIST, -1)
+            res.command_result = CommandResult.ERROR
+            res.command = Commands.NAV
+            res.nav = NavResult(NavMessage.INVALID_DIST, -1)
             return res
 
-        if self.getDamageLevel(eDevice.NAV) < 0 and dist > 0.2:
+        if self.get_damage_level(DeviceType.NAV) < 0 and dist > 0.2:
             res = Result()
-            res.CommandResult = CommandResult.Damaged
-            res.Command = Commands.NAV
+            res.command_result = CommandResult.DAMAGED
+            res.command = Commands.NAV
             return res
 
-        starshipQuadrant = self.galaxy.GetQuadrantByCoord(self.galaxy.CurrentQuadrant.coord)
-        starshipSector = self.galaxy.GetStarshipSector()
+        starship_quadrant = self.galaxy.get_quadrant_by_coord(self.galaxy.current_quadrant.coord)
+        starship_sector = self.galaxy.get_starship_sector()
 
-        fdo = calculationUtils.GetFinalDestination(dir, dist, starshipSector, self.galaxy.CurrentQuadrant)
-        if fdo.OutSideGalaxy:
+        fdo = CalculationUtils.get_final_destination(
+            dir, dist, starship_sector, self.galaxy.current_quadrant
+        )
+        if fdo.out_side_galaxy:
             res = Result()
-            res.CommandResult = CommandResult.Error
-            res.Command = Commands.NAV
-            res.NAV = NAV(NavMessage.BadInput_OutsideGalaxy, -1)
+            res.command_result = CommandResult.ERROR
+            res.command = Commands.NAV
+            res.nav = NavResult(NavMessage.BAD_INPUT_OUTSIDE_GALAXY, -1)
             return res
 
-        estEnergyForTrip = calculationUtils.Distance2Energy(self.galaxy.CurrentQuadrant.coord, starshipSector.coord, fdo.FinalQuadrant, fdo.FinalSector)
+        est_energy_for_trip = CalculationUtils.distance2_energy(
+            self.galaxy.current_quadrant.coord,
+            starship_sector.coord,
+            fdo.final_quadrant,
+            fdo.final_sector,
+        )
 
-        if self.galaxy.Starship.energyLevel < estEnergyForTrip:
-            if self.galaxy.Starship.energyLevel + self.galaxy.Starship.shieldLevel > estEnergyForTrip:
+        if self.galaxy.starship.energy_level < est_energy_for_trip:
+            if (
+                self.galaxy.starship.energy_level + self.galaxy.starship.shield_level
+                > est_energy_for_trip
+            ):
                 res = Result()
-                res.CommandResult = CommandResult.Error
-                res.Command = Commands.NAV
-                res.NAV = NAV(NavMessage.InsufficientEnergy_ShieldEnergyAvailable, -1)
+                res.command_result = CommandResult.ERROR
+                res.command = Commands.NAV
+                res.nav = NavResult(NavMessage.INSUFFICIENT_ENERGY_SHIELD_ENERGY_AVAILABLE, -1)
                 return res
             else:
                 res = Result()
-                res.CommandResult = CommandResult.Error
-                res.Command = Commands.NAV
-                res.NAV = NAV(NavMessage.InsufficientEnergy, -1)
+                res.command_result = CommandResult.ERROR
+                res.command = Commands.NAV
+                res.nav = NavResult(NavMessage.INSUFFICIENT_ENERGY, -1)
                 return res
 
-        # print(f"b4 x={self.galaxy.GetStarshipSector().coord.x}")
-        # print(f"b4 y={self.galaxy.GetStarshipSector().coord.y}")
+        nav_msg = self.check_route_and_move_starship(
+            dir,
+            dist,
+            est_energy_for_trip,
+            starship_quadrant.coord,
+            fdo.final_quadrant,
+            fdo.final_sector,
+        )
 
-        navMsg = self.checkRouteAndMoveStarship(dir, dist, estEnergyForTrip, starshipQuadrant.Coord,
-                                                  fdo.FinalQuadrant, fdo.FinalSector)
-
-        # print(f"af x={self.galaxy.GetStarshipSector().coord.x}")
-        # print(f"af y={self.galaxy.GetStarshipSector().coord.y}")
-
-
-        if fdo.ObjectHit:
+        if fdo.object_hit:
             res = Result()
-            res.CommandResult = CommandResult.Error
-            res.Command = Commands.NAV
-            distTraveled = calculationUtils.GetDistance(starshipSector.coord, fdo.FinalSector)
-            res.NAV = NAV(NavMessage.BadInput_ObjectHit, distTraveled)
+            res.command_result = CommandResult.ERROR
+            res.command = Commands.NAV
+            dist_traveled = CalculationUtils.get_distance(starship_sector.coord, fdo.final_sector)
+            res.nav = NavResult(NavMessage.BAD_INPUT_OBJECT_HIT, dist_traveled)
             return res
 
-
-        if starshipQuadrant.Coord.x != fdo.FinalQuadrant.x or starshipQuadrant.Coord.y != fdo.FinalQuadrant.y:
-            distTraveled = calculationUtils.GetDistance(starshipQuadrant.Coord, fdo.FinalQuadrant) * 8
+        if (
+            starship_quadrant.coord.x != fdo.final_quadrant.x
+            or starship_quadrant.coord.y != fdo.final_quadrant.y
+        ):
+            dist_traveled = (
+                CalculationUtils.get_distance(starship_quadrant.coord, fdo.final_quadrant) * 8
+            )
         else:
-            distTraveled = calculationUtils.GetDistance(starshipSector.coord, fdo.FinalSector) * 8
-
+            dist_traveled = (
+                CalculationUtils.get_distance(starship_sector.coord, fdo.final_sector) * 8
+            )
 
         res = Result()
-        res.CommandResult = CommandResult.OK
-        res.Command = Commands.NAV
-        res.NAV = NAV(navMsg, distTraveled)
+        res.command_result = CommandResult.OK
+        res.command = Commands.NAV
+        res.nav = NavResult(nav_msg, dist_traveled)
         return res
 
-    def routine_maint(self, changeMissionTime: float, enemiesFire: bool):
-        dockingStatus = DockingStatus(self.galaxy.Starship.isDocked, False)
-        self.galaxy.Starship.isDocked = False
+    def routine_maint(self, change_mission_time: float, enemies_fire: bool):
+        docking_status = DockingStatus(self.galaxy.starship.is_docked, False)
+        self.galaxy.starship.is_docked = False
 
-        if self.galaxy.Starship.shieldLevel == 0 and self.canBeDocked():
-            dockingStatus.CurrentStatus = True
-            self.galaxy.Starship.isDocked = True
-            self.galaxy.Starship.energyLevel = gbl.MAX_STARSHIP_ENERGY
-            self.galaxy.Starship.torpsRemain = gbl.MAX_STARSHIP_TORP
+        if self.galaxy.starship.shield_level == 0 and self.can_be_docked():
+            docking_status.current_status = True
+            self.galaxy.starship.is_docked = True
+            self.galaxy.starship.energy_level = gbl.MAX_STARSHIP_ENERGY
+            self.galaxy.starship.torps_remain = gbl.MAX_STARSHIP_TORP
         else:
-            if self.galaxy.Starship.shieldLevel != 0 and self.galaxy.Starship.isDocked:
-                dockingStatus.CurrentStatus = False
-                self.galaxy.Starship.isDocked = False
+            if self.galaxy.starship.shield_level != 0 and self.galaxy.starship.is_docked:
+                docking_status.current_status = False
+                self.galaxy.starship.is_docked = False
 
-        gameStatus = GameStatus.Normal
+        game_status = GameStatus.NORMAL
 
-        if self.galaxy.MissionTime > self.galaxy.MissionTimeDeadline:
-            gameStatus = GameStatus.RanOutOfTime
-        if self.galaxy.Starship.isDestroyed:
-            gameStatus = GameStatus.StarshipDestroyed
-        if self.galaxy.Starship.energyLevel == 0 and self.galaxy.Starship.shieldLevel == 0:
-            gameStatus = GameStatus.Normal.RanOutOfEnergy
-        if self.galaxy.Starship.energyLevel ==0 and self.galaxy.Starship.shieldLevel > 0 and self.getDamageLevel(eDevice.SHE) >= 0:
-            gameStatus = GameStatus.OutOfEnergyShieldEnergyAvailable
-        if self.galaxy.Starship.energyLevel ==0 and self.galaxy.Starship.shieldLevel > 0 and self.getDamageLevel(eDevice.SHE) < 0:
-            gameStatus = GameStatus.RanOutOfEnergy
-        if otherFactories.getEnemiesRemaining(self.galaxy) == 0:
-            gameStatus = GameStatus.MissionOver
+        if self.galaxy.mission_time > self.galaxy.mission_time_deadline:
+            game_status = GameStatus.RAN_OUT_OF_TIME
+        if self.galaxy.starship.is_destroyed:
+            game_status = GameStatus.STARSHIP_DESTROYED
+        if self.galaxy.starship.energy_level == 0 and self.galaxy.starship.shield_level == 0:
+            game_status = GameStatus.RAN_OUT_OF_ENERGY
+        if (
+            self.galaxy.starship.energy_level == 0
+            and self.galaxy.starship.shield_level > 0
+            and self.get_damage_level(DeviceType.SHE) >= 0
+        ):
+            game_status = GameStatus.OUT_OF_ENERGY_SHIELD_ENERGY_AVAILABLE
+        if (
+            self.galaxy.starship.energy_level == 0
+            and self.galaxy.starship.shield_level > 0
+            and self.get_damage_level(DeviceType.SHE) < 0
+        ):
+            game_status = GameStatus.RAN_OUT_OF_ENERGY
+        if OtherFactories.get_enemies_remaining(self.galaxy) == 0:
+            game_status = GameStatus.MISSION_OVER
 
-        enemiesFired = []
-        if not self.preventEnemyFire and enemiesFire:
-            enemiesFired = self.enemiesFired()
+        enemies_fired = []
+        if not self.prevent_enemy_fire and enemies_fire:
+            enemies_fired = self.enemies_fired()
 
-        if self.galaxy.Starship.isDestroyed:
-            gameStatus = GameStatus.StarshipDestroyed
+        if self.galaxy.starship.is_destroyed:
+            game_status = GameStatus.STARSHIP_DESTROYED
 
-        enemiesMoved = self.enemiesMoved()
+        enemies_moved = self.enemies_moved()
 
         res = Result()
-        res.MaintResult = MaintResult(self.updateMissionTime(changeMissionTime),
-                                      self.updateDamagedDevicesWithMissionTime(changeMissionTime),
-                                      enemiesFired,
-                                      enemiesMoved,
-                                      dockingStatus,
-                                      self.StarbaseRepairs(),
-                                      gameStatus)
+        res.maint_result = MaintResult(
+            self.update_mission_time(change_mission_time),
+            self.update_damaged_devices_with_mission_time(change_mission_time),
+            enemies_fired,
+            enemies_moved,
+            docking_status,
+            self.starbase_repairs(),
+            game_status,
+        )
         return res
 
-    def RunStarbaseRepair(self):
-        timeToRepair = self.StarbaseRepairs()
-        if timeToRepair is None:
+    def run_starbase_repair(self):
+        time_to_repair = self.starbase_repairs()
+        if time_to_repair is None:
             raise RuntimeError("timeToRepair is null")
-        self.executeStarbaseRepair(timeToRepair.MissionTimeToRepair)
-        
-    # endregion
+        self.execute_starbase_repair(time_to_repair.mission_time_to_repair)
 
-    # region Utils
-    def str2int(self, string:str) -> int|None:
+    def str2int(self, string: str) -> int | None:
         try:
-            xInt = int(string)
+            x_int = int(string)
         except ValueError:
             return None
-        return xInt
+        return x_int
 
-    def str2float(self, string:str) -> float|None:
+    def str2float(self, string: str) -> float | None:
         try:
-            xFloat = float(string)
-            if not math.isfinite(xFloat):
+            x_float = float(string)
+            if not math.isfinite(x_float):
                 return None
         except ValueError:
             return None
-        return xFloat
+        return x_float
 
-    def enemiesFired(self) -> list[EnemyFired]:
-        enemySectors = self.galaxy.CurrentQuadrant.GetEnemySectors()
-        if enemySectors is None:
+    def enemies_fired(self) -> list[EnemyFired]:
+        enemy_sectors = self.galaxy.current_quadrant.get_enemy_sectors()
+        if enemy_sectors is None:
             return []
 
-        enemiesFiredReturn = []
-        for enemySector in enemySectors:
-            enemyHitAmount = self.randomFactory.GetRandomInteger(gbl.RIT_ENEMY_FIRED_AMOUNT)
+        enemies_fired_return = []
+        for enemy_sector in enemy_sectors:
+            enemy_hit_amount = self.random_factory.get_random_integer(gbl.RIT_ENEMY_FIRED_AMOUNT)
 
-            if self.galaxy.Starship.isDocked:
-                enemyFire = enemyFired.EnemyFired(enemySector.coord,
-                                                  self.galaxy.Starship.shieldLevel,
-                                                  False,
-                                                  None,
-                                                  enemyHitAmount,
-                                                  None,
-                                                  True)
-                enemiesFiredReturn.append(enemyFire)
+            if self.galaxy.starship.is_docked:
+                enemy_fire = enemy_fired.EnemyFired(
+                    enemy_sector.coord,
+                    self.galaxy.starship.shield_level,
+                    False,
+                    None,
+                    enemy_hit_amount,
+                    None,
+                    True,
+                )
+                enemies_fired_return.append(enemy_fire)
             else:
-                self.galaxy.Starship.shieldLevel -= enemyHitAmount
-                if self.galaxy.Starship.shieldLevel < 0 and not self.galaxy.Starship.isDocked:
-                    self.galaxy.Starship.isDestroyed = True
-                    enemyFire = enemyFired.EnemyFired(enemySector.coord,
-                                                      self.galaxy.Starship.shieldLevel,
-                                                      True,
-                                                      None,
-                                                      enemyHitAmount,
-                                                      None,
-                                                      False)
-                    enemiesFiredReturn.append(enemyFire)
-                    return enemiesFiredReturn
+                self.galaxy.starship.shield_level -= enemy_hit_amount
+                if self.galaxy.starship.shield_level < 0 and not self.galaxy.starship.is_docked:
+                    self.galaxy.starship.is_destroyed = True
+                    enemy_fire = enemy_fired.EnemyFired(
+                        enemy_sector.coord,
+                        self.galaxy.starship.shield_level,
+                        True,
+                        None,
+                        enemy_hit_amount,
+                        None,
+                        False,
+                    )
+                    enemies_fired_return.append(enemy_fire)
+                    return enemies_fired_return
 
-                damagedDevice: Device | None = None
-                if self.randomFactory.GetRandomInteger(gbl.RIT_DAMAGE_DEVICE_CHANCE) > gbl.DAMAGE_DEVICE_RANDOM_NUMBER_THRESHOLD:
+                damaged_device: Device | None = None
+                if (
+                    self.random_factory.get_random_integer(gbl.RIT_DAMAGE_DEVICE_CHANCE)
+                    > gbl.DAMAGE_DEVICE_RANDOM_NUMBER_THRESHOLD
+                ):
                     while True:
-                        damagedDeviceNum = self.randomFactory.GetRandomInteger(gbl.RIT_DAMAGE_DEVICE)
-                        targetDevice = self.galaxy.Starship.GetDevice(eDevice(damagedDeviceNum))
-                        if targetDevice.damageLevel >= 0:
-                            damagedDevice = targetDevice
+                        damaged_device_num = self.random_factory.get_random_integer(
+                            gbl.RIT_DAMAGE_DEVICE
+                        )
+                        target_device = self.galaxy.starship.get_device(
+                            DeviceType(damaged_device_num)
+                        )
+                        if target_device.damage_level >= 0:
+                            damaged_device = target_device
                             break
 
-                    damagedDeviceMissionTime = self.randomFactory.GetRandomInteger(gbl.RIT_DAMAGE_DEVICE_AMOUNT)
-                    damagedDevice.damageLevel = damagedDeviceMissionTime * -1
-                    enemyFire = enemyFired.EnemyFired(enemySector.coord,
-                                                      self.galaxy.Starship.shieldLevel,
-                                                      True,
-                                                      damagedDevice,
-                                                      enemyHitAmount,
-                                                      damagedDeviceMissionTime,
-                                                      False)
-                    enemiesFiredReturn.append(enemyFire)
+                    damaged_device_mission_time = self.random_factory.get_random_integer(
+                        gbl.RIT_DAMAGE_DEVICE_AMOUNT
+                    )
+                    damaged_device.damage_level = damaged_device_mission_time * -1
+                    enemy_fire = enemy_fired.EnemyFired(
+                        enemy_sector.coord,
+                        self.galaxy.starship.shield_level,
+                        True,
+                        damaged_device,
+                        enemy_hit_amount,
+                        damaged_device_mission_time,
+                        False,
+                    )
+                    enemies_fired_return.append(enemy_fire)
                     continue
 
-                enemyFire = enemyFired.EnemyFired(enemySector.coord,
-                                                  self.galaxy.Starship.shieldLevel,
-                                                  False,
-                                                  None,
-                                                  enemyHitAmount,
-                                                  None,
-                                                  False)
-                enemiesFiredReturn.append(enemyFire)
+                enemy_fire = enemy_fired.EnemyFired(
+                    enemy_sector.coord,
+                    self.galaxy.starship.shield_level,
+                    False,
+                    None,
+                    enemy_hit_amount,
+                    None,
+                    False,
+                )
+                enemies_fired_return.append(enemy_fire)
 
-        return enemiesFiredReturn
+        return enemies_fired_return
 
-    def enemiesMoved(self) -> list[EnemyMoved]:
-        enemySectors = self.galaxy.CurrentQuadrant.GetEnemySectors()
-        if enemySectors is None:
+    def enemies_moved(self) -> list[EnemyMoved]:
+        enemy_sectors = self.galaxy.current_quadrant.get_enemy_sectors()
+        if enemy_sectors is None:
             return []
-        if self.skipEnemyMove:
+        if self.skip_enemy_move:
             return []
 
-        enemiesMoved = []
-        for enemySector in enemySectors:
-            enemyMoveChance = self.randomFactory.GetRandomInteger(gbl.RIT_ENEMY_MOVE_CHANCE)
+        enemies_moved = []
+        for enemy_sector in enemy_sectors:
+            enemy_move_chance = self.random_factory.get_random_integer(gbl.RIT_ENEMY_MOVE_CHANCE)
 
-            if enemyMoveChance < gbl.ENEMY_MOVE_CHANCE and not self.forceEnemyMove:
+            if enemy_move_chance < gbl.ENEMY_MOVE_CHANCE and not self.force_enemy_move:
                 continue
 
-            mt_sector = self.currentQuadrantFactory.CurrentQuadrantFactory.GetRandomEmptySector(self.randomFactory, self.galaxy.CurrentQuadrant, gbl.RCT_ENEMY_LOCATION)
+            mt_sector = (
+                self.current_quadrant_factory.CurrentQuadrantFactory.get_random_empty_sector(
+                    self.random_factory, self.galaxy.current_quadrant, gbl.RCT_ENEMY_LOCATION
+                )
+            )
 
-            self.moveObjectInsideQuadrant(enemySector.coord, mt_sector.coord)
-            enemyMoved = EnemyMoved(enemySector.coord, mt_sector.coord)
-            enemiesMoved.append(enemyMoved)
+            self.move_object_inside_quadrant(enemy_sector.coord, mt_sector.coord)
+            enemy_moved = EnemyMoved(enemy_sector.coord, mt_sector.coord)
+            enemies_moved.append(enemy_moved)
 
-        return enemiesMoved
+        return enemies_moved
 
-    def updateDamagedDevicesWithMissionTime(self, missionTime: float) -> list[Device]:
-        damagedDevices = self.galaxy.Starship.GetDamgedDevices()
-        for device in damagedDevices:
-            device.damageLevel += missionTime
-            device.damageLevel = round(device.damageLevel, 1)
-            if round(device.damageLevel >= 0):
-                device.damageLevel = 100
-        return damagedDevices
+    def update_damaged_devices_with_mission_time(self, mission_time: float) -> list[Device]:
+        damaged_devices = self.galaxy.starship.get_damaged_devices()
+        for device in damaged_devices:
+            device.damage_level += mission_time
+            device.damage_level = round(device.damage_level, 1)
+            if round(device.damage_level >= 0):
+                device.damage_level = 100
+        return damaged_devices
 
-    def updateMissionTime(self, changeMissionTime: float) -> float:
-        self.galaxy.MissionTime += changeMissionTime
-        return self.galaxy.MissionTime
+    def update_mission_time(self, change_mission_time: float) -> float:
+        self.galaxy.mission_time += change_mission_time
+        return self.galaxy.mission_time
 
-    def checkRouteAndMoveStarship(self, dir: float, dist: float, estEnergyForTrip:int, startSectorCoord: Coord, FinalQuadrant: Coord, FinalSector: Coord) -> NavMessage:
-        cfo = DetectObject.detectObjectWithDist(self.galaxy.CurrentQuadrant, startSectorCoord, True, dir, dist)
-        starshipSector = self.galaxy.GetStarshipSector()
+    def check_route_and_move_starship(
+        self,
+        dir: float,
+        dist: float,
+        est_energy_for_trip: int,
+        start_sector_coord: Coord,
+        final_quadrant: Coord,
+        final_sector: Coord,
+    ) -> NavMessage:
+        cfo = DetectObject.detect_object_with_dist(
+            self.galaxy.current_quadrant, start_sector_coord, True, dir, dist
+        )
+        starship_sector = self.galaxy.get_starship_sector()
         if cfo.object == gbl.SECTOR_EMPTY:
-            if FinalQuadrant.x == self.galaxy.CurrentQuadrant.coord.x and FinalQuadrant.y == self.galaxy.CurrentQuadrant.coord.y:
-                self.moveObjectInsideQuadrant(starshipSector.coord, FinalSector)
+            if (
+                final_quadrant.x == self.galaxy.current_quadrant.coord.x
+                and final_quadrant.y == self.galaxy.current_quadrant.coord.y
+            ):
+                self.move_object_inside_quadrant(starship_sector.coord, final_sector)
             else:
-                destQuadrant = self.galaxy.GetQuadrantByCoord(FinalQuadrant)
-                self.moveStarshipQuadrant(destQuadrant, FinalSector)
-            self.galaxy.Starship.energyLevel -= estEnergyForTrip
-            return NavMessage.TransitComplete
+                dest_quadrant = self.galaxy.get_quadrant_by_coord(final_quadrant)
+                self.move_starship_quadrant(dest_quadrant, final_sector)
+            self.galaxy.starship.energy_level -= est_energy_for_trip
+            return NavMessage.TRANSIT_COMPLETE
         else:
-            nextToLastCoord = cfo.trackingCoords[-1]
-            estEnergyForAbortedTrip = calculationUtils.Distance2Energy(self.galaxy.CurrentQuadrant.coord,
-                                                                       starshipSector.coord,
-                                                                       self.galaxy.CurrentQuadrant.coord,
-                                                                       nextToLastCoord)
-            self.moveObjectInsideQuadrant(starshipSector.coord, nextToLastCoord)
-            self.galaxy.Starship.energyLevel -= estEnergyForAbortedTrip
-            return NavMessage.BadInput_ObjectHit
+            next_to_last_coord = cfo.tracking_coords[-1]
+            est_energy_for_aborted_trip = CalculationUtils.distance2_energy(
+                self.galaxy.current_quadrant.coord,
+                starship_sector.coord,
+                self.galaxy.current_quadrant.coord,
+                next_to_last_coord,
+            )
+            self.move_object_inside_quadrant(starship_sector.coord, next_to_last_coord)
+            self.galaxy.starship.energy_level -= est_energy_for_aborted_trip
+            return NavMessage.BAD_INPUT_OBJECT_HIT
 
-    def moveStarshipQuadrant(self, newQuadrant:Quadrant, sectorCoord: Coord) -> None:
-        self.galaxy.CurrentQuadrant = self.currentQuadrantFactory.CurrentQuadrantFactory.CreateCurrentQuadrant(newQuadrant, self.randomFactory, sectorCoord)
+    def move_starship_quadrant(self, new_quadrant: Quadrant, sector_coord: Coord) -> None:
+        self.galaxy.current_quadrant = (
+            self.current_quadrant_factory.CurrentQuadrantFactory.create_current_quadrant(
+                new_quadrant, self.random_factory, sector_coord
+            )
+        )
 
-    def canBeDocked(self) -> bool:
-        starshipSector = self.galaxy.GetStarshipSector()
-        (topLeft, botRight) = calculationUtils.GetCoordRange(starshipSector.coord)
+    def can_be_docked(self) -> bool:
+        starship_sector = self.galaxy.get_starship_sector()
+        (top_left, bot_right) = CalculationUtils.get_coord_range(starship_sector.coord)
 
-        for x in range(topLeft.x, botRight.x + 1):
-            for y in range(topLeft.y, botRight.y + 1):
-                # print(f"x = {x}, y = {y}\n")
-                sect = self.galaxy.CurrentQuadrant.GetSector(x,y)
-                if sect.sectorContents.hasStarbase():
+        for x in range(top_left.x, bot_right.x + 1):
+            for y in range(top_left.y, bot_right.y + 1):
+                sect = self.galaxy.current_quadrant.get_sector(x, y)
+                if sect.sector_contents.has_starbase():
                     return True
         return False
 
-    def setDamageLevel(self, device: eDevice, damageLevel:float) -> None:
-        targetDev = self.galaxy.Starship.GetDevice(device)
-        targetDev.damageLevel = damageLevel
+    def set_damage_level(self, device: DeviceType, damage_level: float) -> None:
+        target_dev = self.galaxy.starship.get_device(device)
+        target_dev.damage_level = damage_level
 
-    def getDamageLevel(self, device: eDevice) -> float:
-        targetDev = self.galaxy.Starship.GetDevice(device)
-        return targetDev.damageLevel
+    def get_damage_level(self, device: DeviceType) -> float:
+        target_dev = self.galaxy.starship.get_device(device)
+        return target_dev.damage_level
 
-    def getFormattedCoord(self, Coord):
-        return f"[{Coord.x},{Coord.y}]"
+    def get_formatted_coord(self, coord):
+        return f"[{coord.x},{coord.y}]"
 
-    def getSectorFormatted(self, sector: Sector) -> str:
-        match sector.sectorContents.sectorContents:
+    def get_sector_formatted(self, sector: Sector) -> str:
+        match sector.sector_contents.sector_contents:
             case gbl.SECTOR_STAR:
                 return "***"
             case gbl.SECTOR_STARSHIP:
@@ -774,101 +860,102 @@ class Game:
             case _:
                 return "???"
 
-    def executeStarbaseRepair(self, missionTime: float) -> None:
-        self.galaxy.MissionTime += abs(missionTime)
-        for device in self.galaxy.Starship.devices:
-            device.damageLevel = 0
+    def execute_starbase_repair(self, mission_time: float) -> None:
+        self.galaxy.mission_time += abs(mission_time)
+        for device in self.galaxy.starship.devices:
+            device.damage_level = 0
 
-    def StarbaseRepairs(self) -> StarbaseRepairs|None:
-        if not self.galaxy.Starship.isDocked:
+    def starbase_repairs(self) -> StarbaseRepairs | None:
+        if not self.galaxy.starship.is_docked:
             return None
-        damagedDevices = self.galaxy.Starship.GetDamgedDevices()
-        if len(damagedDevices) == 0:
+        damaged_devices = self.galaxy.starship.get_damaged_devices()
+        if len(damaged_devices) == 0:
             return None
-        minValue = min(obj.damageLevel for obj in damagedDevices)
-        return StarbaseRepairs(abs(minValue))
+        min_value = min(obj.damage_level for obj in damaged_devices)
+        return StarbaseRepairs(abs(min_value))
 
-    def getCurrentQuadrantFormatted(self) -> str:
-        outString = f"Current Quadrant Coord {self.getFormattedCoord(self.galaxy.CurrentQuadrant.coord)}\n"
+    def get_current_quadrant_formatted(self) -> str:
+        out_string = f"Current Quadrant Coord {self.get_formatted_coord(self.galaxy.current_quadrant.coord)}\n"
         for y in range(-1, gbl.MAX_QUADRANT_SECTOR_XY):
             if y == -1:
-                outString += "###\t\t"
+                out_string += "###\t\t"
             else:
-                outString += f"{y}\t\t"
-        outString += "\n"
+                out_string += f"{y}\t\t"
+        out_string += "\n"
 
         for y in range(gbl.MAX_QUADRANT_SECTOR_XY):
-            outRowString = ""
+            out_row_string = ""
             for x in range(gbl.MAX_QUADRANT_SECTOR_XY):
-                item = self.galaxy.CurrentQuadrant.GetSector(x,y)
-                outRowString += self.getSectorFormatted(item) + "\t\t"
-            outString += f"{y}\t\t{outRowString}\n"
+                item = self.galaxy.current_quadrant.get_sector(x, y)
+                out_row_string += self.get_sector_formatted(item) + "\t\t"
+            out_string += f"{y}\t\t{out_row_string}\n"
 
-        return outString
+        return out_string
 
-    def getQuadrantForGalaxyFormatted(self, quadrant: Quadrant, markStarship:bool) -> str:
+    def get_quadrant_for_galaxy_formatted(self, quadrant: Quadrant, mark_starship: bool) -> str:
         outstr = ""
-        if not quadrant.HasBeenExplored:
+        if not quadrant.has_been_explored:
             return "| *** "
 
-        entMarkerStart = " "
-        entMarkerEnd = " "
-        if markStarship:
-            entMarkerStart = "<"
-            entMarkerEnd = ">"
+        ent_marker_start = " "
+        ent_marker_end = " "
+        if mark_starship:
+            ent_marker_start = "<"
+            ent_marker_end = ">"
 
-        outstr += "|" + entMarkerStart
-        outstr += str(quadrant.NumEnemies)
-        if quadrant.HasStarBase:
+        outstr += "|" + ent_marker_start
+        outstr += str(quadrant.num_enemies)
+        if quadrant.has_star_base:
             outstr += "1"
         else:
             outstr += "0"
 
-        outstr += str(quadrant.NumStars)
-        outstr += entMarkerEnd
+        outstr += str(quadrant.num_stars)
+        outstr += ent_marker_end
         return outstr
 
-    def moveObjectInsideQuadrant(self, source:Coord, dest:Coord) -> None:
+    def move_object_inside_quadrant(self, source: Coord, dest: Coord) -> None:
         if source.x == dest.x and source.y == dest.y:
             return
 
-        sourceSector = self.galaxy.CurrentQuadrant.GetSectorByCoord(source)
-        destSector = self.galaxy.CurrentQuadrant.GetSectorByCoord(dest)
+        source_sector = self.galaxy.current_quadrant.get_sector_by_coord(source)
+        dest_sector = self.galaxy.current_quadrant.get_sector_by_coord(dest)
 
-        destSector.sectorContents.sectorContents = sourceSector.sectorContents.sectorContents
-        if sourceSector.enemy is not None:
-            destSector.enemy =  sourceSector.enemy
-            sourceSector.enemy = None
-        sourceSector.sectorContents.sectorContents = gbl.SECTOR_EMPTY
+        dest_sector.sector_contents.sector_contents = source_sector.sector_contents.sector_contents
+        if source_sector.enemy is not None:
+            dest_sector.enemy = source_sector.enemy
+            source_sector.enemy = None
+        source_sector.sector_contents.sector_contents = gbl.SECTOR_EMPTY
 
-    def getGalaxyFormatted(self) -> str:
-        xHeader = "  <-----------------------X----------------------->\n"
+    def get_galaxy_formatted(self) -> str:
+        x_header = "  <-----------------------X----------------------->\n"
         line = "+-----+-----+-----+-----+-----+-----+-----+-----+\n"
 
-        outStr = xHeader
+        out_str = x_header
         for y in range(gbl.MAX_QUADRANT_SECTOR_XY):
             match y:
                 case 0:
-                    outStr += "^"
+                    out_str += "^"
                 case 4:
-                    outStr += "Y"
+                    out_str += "Y"
                 case _:
-                    outStr += "|"
+                    out_str += "|"
 
-            outStr += " " + line
-            outStr += "| "
+            out_str += " " + line
+            out_str += "| "
 
             for x in range(gbl.MAX_QUADRANT_SECTOR_XY):
-                quad = self.galaxy.GetQuadrant(x,y)
+                quad = self.galaxy.get_quadrant(x, y)
 
-                if quad.Coord.x == self.galaxy.CurrentQuadrant.coord.x and quad.Coord.y == self.galaxy.CurrentQuadrant.coord.y:
-                    outStr += self.getQuadrantForGalaxyFormatted(quad, True)
+                if (
+                    quad.coord.x == self.galaxy.current_quadrant.coord.x
+                    and quad.coord.y == self.galaxy.current_quadrant.coord.y
+                ):
+                    out_str += self.get_quadrant_for_galaxy_formatted(quad, True)
                 else:
-                    outStr += self.getQuadrantForGalaxyFormatted(quad, False)
+                    out_str += self.get_quadrant_for_galaxy_formatted(quad, False)
 
-            outStr += "|\n"
+            out_str += "|\n"
 
-        outStr += "v " + line
-        return outStr
-    # endregion
-
+        out_str += "v " + line
+        return out_str

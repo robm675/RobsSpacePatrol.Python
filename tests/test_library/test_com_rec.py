@@ -1,76 +1,53 @@
-# region imports
-import sys
-
-from models.commandResult import CommandResult
+from models.command_result import CommandResult
 from models.commands import Commands
-from models.starship import eDevice
-from tests.randomFactoryBuilder import RandomFactoryBuilder
+from models.starship import DeviceType
 
-sys.path.append("/pythontrek/source/library/")
-
-import source.library.factories.currentQuadrantFactory as cqf
-import source.library.factories.otherFactories as otherFact
-import source.library.factories.randomFactory as rf
+import source.library.factories.current_quadrant_factory as cqf
+import source.library.factories.other_factories as other_fact
 from source.library.game import game
+from tests.random_factory_builder import RandomFactoryBuilder
 
-# endregion
 
+def test_com_rec_results_not_null():
+    cur_quad = cqf.CurrentQuadrantFactory()
+    random_factory = RandomFactoryBuilder().with_defaults().build()
+    galaxy = other_fact.OtherFactories.create_galaxy(random_factory, cur_quad)
+    game_var = game.Game(galaxy, random_factory, cur_quad)
 
-def test_COM_REC_ResultsNotNull():
-    curQuad = cqf.CurrentQuadrantFactory()
-    randomFactory = (
-        RandomFactoryBuilder()
-        .WithDefaults()
-        .Build()
-    )
-    galaxy = otherFact.otherFactories.createGalaxy(randomFactory, curQuad)
-    gameVar = game.Game(galaxy, randomFactory, curQuad)
-
-    result = gameVar.com_rec()
+    result = game_var.com_rec()
 
     assert result is not None
 
-def test_COM_REC_HasContents():
-    curQuad = cqf.CurrentQuadrantFactory()
-    randomFactory = (
-        RandomFactoryBuilder()
-        .WithDefaults()
-        .Build()
-    )
-    galaxy = otherFact.otherFactories.createGalaxy(randomFactory, curQuad)
-    gameVar = game.Game(galaxy, randomFactory, curQuad)
 
-    result = gameVar.com_rec()
+def test_com_rec_has_contents():
+    cur_quad = cqf.CurrentQuadrantFactory()
+    random_factory = RandomFactoryBuilder().with_defaults().build()
+    galaxy = other_fact.OtherFactories.create_galaxy(random_factory, cur_quad)
+    game_var = game.Game(galaxy, random_factory, cur_quad)
 
-    assert result.CommandResult == CommandResult.OK
+    result = game_var.com_rec()
 
-def test_COM_REC_Damaged():
-    curQuad = cqf.CurrentQuadrantFactory()
-    randomFactory = (
-        RandomFactoryBuilder()
-        .WithDefaults()
-        .Build()
-    )
-    galaxy = otherFact.otherFactories.createGalaxy(randomFactory, curQuad)
-    gameVar = game.Game(galaxy, randomFactory, curQuad)
-    gameVar.galaxy.Starship.GetDevice(eDevice.COM).damageLevel = -3
-    result = gameVar.com_rec()
-
-    assert result.CommandResult == CommandResult.Damaged
-    assert result.Command == Commands.COM_REC
-
-def test_COM_REC_VerifyContents():
-    curQuad = cqf.CurrentQuadrantFactory()
-    randomFactory = (
-        RandomFactoryBuilder()
-        .WithDefaults()
-        .Build()
-    )
-    galaxy = otherFact.otherFactories.createGalaxy(randomFactory, curQuad)
-    gameVar = game.Game(galaxy, randomFactory, curQuad)
+    assert result.command_result == CommandResult.OK
 
 
-    result = gameVar.com_rec()
+def test_com_rec_damaged():
+    cur_quad = cqf.CurrentQuadrantFactory()
+    random_factory = RandomFactoryBuilder().with_defaults().build()
+    galaxy = other_fact.OtherFactories.create_galaxy(random_factory, cur_quad)
+    game_var = game.Game(galaxy, random_factory, cur_quad)
+    game_var.galaxy.starship.get_device(DeviceType.COM).damage_level = -3
+    result = game_var.com_rec()
+
+    assert result.command_result == CommandResult.DAMAGED
+    assert result.command == Commands.COM_REC
 
 
-    assert len(result.COM_REC.Quadrants) != 0
+def test_com_rec_verify_contents():
+    cur_quad = cqf.CurrentQuadrantFactory()
+    random_factory = RandomFactoryBuilder().with_defaults().build()
+    galaxy = other_fact.OtherFactories.create_galaxy(random_factory, cur_quad)
+    game_var = game.Game(galaxy, random_factory, cur_quad)
+
+    result = game_var.com_rec()
+
+    assert len(result.com_rec.quadrants) != 0

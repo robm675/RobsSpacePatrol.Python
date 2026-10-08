@@ -1,343 +1,301 @@
-# region imports
-import sys
-from unittest.mock import MagicMock
-
-from models.commandResult import CommandResult
+from models.command_result import CommandResult
 from models.commands import Commands
-from models.starship import eDevice
-from models.navMessage import NavMessage
-from tests.randomFactoryBuilder import RandomFactoryBuilder
+from models.nav_message import NavMessage
+from models.starship import DeviceType
 
-sys.path.append("/pythontrek/source/library/")
-
-import source.library.factories.currentQuadrantFactory as cqf
-import source.library.factories.otherFactories as otherFact
+import source.library.factories.current_quadrant_factory as cqf
+import source.library.factories.other_factories as other_fact
 from source import gbl
+from source.library.factories.random_factory import RandomFactory
 from source.library.game import game
-from source.library.models import coord
-
-from source.library.factories.randomFactory import RandomFactory
-
-# endregion
+from tests.random_factory_builder import RandomFactoryBuilder
 
 
-def create_random_factory(*, bottom_right: bool = False, object_in_way: bool = False,
-                          quadrant_visits: int = 1) -> RandomFactory:
+def create_random_factory(
+    *, bottom_right: bool = False, object_in_way: bool = False, quadrant_visits: int = 1
+) -> RandomFactory:
     """Choose the normal, bottom-right, or obstructed-route NAV scenario."""
     if bottom_right and object_in_way:
         raise ValueError("Choose bottom_right or object_in_way, not both")
     if type(quadrant_visits) is not int or quadrant_visits < 1:
         raise ValueError("quadrant_visits must be a positive integer")
-    stars = ((5, 0), (7, 6) ,(5, 6)) if object_in_way else ((7, 6), (7, 7))
+    stars = ((5, 0), (7, 6), (5, 6)) if object_in_way else ((7, 6), (7, 7))
     return (
-        RandomFactoryBuilder().WithDefaults()
-        .SetStarshipQuadrant(*(7, 7) if bottom_right else (0, 0))
-        .SetStarQuantity(2)
-        .SetCoords(gbl.RCT_STAR_LOCATION, *stars * quadrant_visits)
-        .Build()
-    )
-
-
-def test_NAV_ResultsNotNull():
-    curQuad = cqf.CurrentQuadrantFactory()
-    randomFactory = (
         RandomFactoryBuilder()
-        .WithDefaults()
-        .Build()
+        .with_defaults()
+        .set_starship_quadrant(*(7, 7) if bottom_right else (0, 0))
+        .set_star_quantity(2)
+        .set_coords(gbl.RCT_STAR_LOCATION, *stars * quadrant_visits)
+        .build()
     )
-    galaxy = otherFact.otherFactories.createGalaxy(randomFactory, curQuad)
-    gameVar = game.Game(galaxy, randomFactory, curQuad)
 
-    result = gameVar.nav(1,1)
+
+def test_nav_results_not_null():
+    cur_quad = cqf.CurrentQuadrantFactory()
+    random_factory = RandomFactoryBuilder().with_defaults().build()
+    galaxy = other_fact.OtherFactories.create_galaxy(random_factory, cur_quad)
+    game_var = game.Game(galaxy, random_factory, cur_quad)
+
+    result = game_var.nav(1, 1)
 
     assert result is not None
 
-def test_NAV_HasContents():
-    testMock = create_random_factory(quadrant_visits=2)
 
+def test_nav_has_contents():
+    test_mock = create_random_factory(quadrant_visits=2)
 
-    curQuad = cqf.CurrentQuadrantFactory()
-    galaxy = otherFact.otherFactories.createGalaxy(testMock, curQuad)
-    gameVar = game.Game(galaxy, testMock, curQuad)
+    cur_quad = cqf.CurrentQuadrantFactory()
+    galaxy = other_fact.OtherFactories.create_galaxy(test_mock, cur_quad)
+    game_var = game.Game(galaxy, test_mock, cur_quad)
 
-    result = gameVar.nav(1,1)
+    result = game_var.nav(1, 1)
 
-    assert result.CommandResult == CommandResult.OK
+    assert result.command_result == CommandResult.OK
 
-def test_NAV_BadDIR0():
-    testMock = create_random_factory()
 
+def test_nav_bad_dir0():
+    test_mock = create_random_factory()
 
+    cur_quad = cqf.CurrentQuadrantFactory()
+    galaxy = other_fact.OtherFactories.create_galaxy(test_mock, cur_quad)
+    game_var = game.Game(galaxy, test_mock, cur_quad)
 
-    curQuad = cqf.CurrentQuadrantFactory()
-    galaxy = otherFact.otherFactories.createGalaxy(testMock, curQuad)
-    gameVar = game.Game(galaxy, testMock, curQuad)
+    result = game_var.nav(0, 1)
 
-    result = gameVar.nav(0,1)
+    assert result.command_result == CommandResult.ERROR
+    assert result.nav.nav_message == NavMessage.INVALID_DIR
 
-    assert result.CommandResult == CommandResult.Error
-    assert result.NAV.NavMessage == NavMessage.InvalidDIR
 
-def test_NAV_BadDIR9():
-    testMock = create_random_factory()
+def test_nav_bad_dir9():
+    test_mock = create_random_factory()
 
+    cur_quad = cqf.CurrentQuadrantFactory()
+    galaxy = other_fact.OtherFactories.create_galaxy(test_mock, cur_quad)
+    game_var = game.Game(galaxy, test_mock, cur_quad)
 
+    result = game_var.nav(9, 1)
 
-    curQuad = cqf.CurrentQuadrantFactory()
-    galaxy = otherFact.otherFactories.createGalaxy(testMock, curQuad)
-    gameVar = game.Game(galaxy, testMock, curQuad)
+    assert result.command_result == CommandResult.ERROR
+    assert result.nav.nav_message == NavMessage.INVALID_DIR
 
-    result = gameVar.nav(9,1)
 
-    assert result.CommandResult == CommandResult.Error
-    assert result.NAV.NavMessage == NavMessage.InvalidDIR
+def test_nav_bad_dist0():
+    test_mock = create_random_factory()
 
-def test_NAV_BadDIST0():
-    testMock = create_random_factory()
+    cur_quad = cqf.CurrentQuadrantFactory()
+    galaxy = other_fact.OtherFactories.create_galaxy(test_mock, cur_quad)
+    game_var = game.Game(galaxy, test_mock, cur_quad)
 
+    result = game_var.nav(1, 0)
 
+    assert result.command_result == CommandResult.ERROR
+    assert result.nav.nav_message == NavMessage.INVALID_DIST
 
-    curQuad = cqf.CurrentQuadrantFactory()
-    galaxy = otherFact.otherFactories.createGalaxy(testMock, curQuad)
-    gameVar = game.Game(galaxy, testMock, curQuad)
 
-    result = gameVar.nav(1,0)
+def test_nav_bad_dist9():
+    test_mock = create_random_factory()
 
-    assert result.CommandResult == CommandResult.Error
-    assert result.NAV.NavMessage == NavMessage.InvalidDIST
+    cur_quad = cqf.CurrentQuadrantFactory()
+    galaxy = other_fact.OtherFactories.create_galaxy(test_mock, cur_quad)
+    game_var = game.Game(galaxy, test_mock, cur_quad)
 
-def test_NAV_BadDIST9():
-    testMock = create_random_factory()
+    result = game_var.nav(1, 9)
 
+    assert result.command_result == CommandResult.ERROR
+    assert result.nav.nav_message == NavMessage.INVALID_DIST
 
 
-    curQuad = cqf.CurrentQuadrantFactory()
-    galaxy = otherFact.otherFactories.createGalaxy(testMock, curQuad)
-    gameVar = game.Game(galaxy, testMock, curQuad)
+def test_nav_damaged_bad_dist1():
+    test_mock = create_random_factory()
 
-    result = gameVar.nav(1,9)
+    cur_quad = cqf.CurrentQuadrantFactory()
+    galaxy = other_fact.OtherFactories.create_galaxy(test_mock, cur_quad)
+    game_var = game.Game(galaxy, test_mock, cur_quad)
+    game_var.galaxy.starship.get_device(DeviceType.NAV).damage_level = -3
 
-    assert result.CommandResult == CommandResult.Error
-    assert result.NAV.NavMessage == NavMessage.InvalidDIST
+    result = game_var.nav(1, 1)
 
-def test_NAV_Damaged_BadDIST1():
-    testMock = create_random_factory()
+    assert result.command_result == CommandResult.DAMAGED
 
 
-    curQuad = cqf.CurrentQuadrantFactory()
-    galaxy = otherFact.otherFactories.createGalaxy(testMock, curQuad)
-    gameVar = game.Game(galaxy, testMock, curQuad)
-    gameVar.galaxy.Starship.GetDevice(eDevice.NAV).damageLevel = -3
+def test_nav_outside_galaxy_top():
+    test_mock = create_random_factory()
 
+    cur_quad = cqf.CurrentQuadrantFactory()
+    galaxy = other_fact.OtherFactories.create_galaxy(test_mock, cur_quad)
+    game_var = game.Game(galaxy, test_mock, cur_quad)
 
-    result = gameVar.nav(1,1)
+    result = game_var.nav(3, 1)
 
+    assert result.command == Commands.NAV
+    assert result.command_result == CommandResult.ERROR
+    assert result.nav.nav_message == NavMessage.BAD_INPUT_OUTSIDE_GALAXY
 
-    assert result.CommandResult == CommandResult.Damaged
 
-def test_NAV_OutsideGalaxy_Top():
-    testMock = create_random_factory()
+def test_nav_outside_galaxy_left():
+    test_mock = create_random_factory()
 
+    cur_quad = cqf.CurrentQuadrantFactory()
+    galaxy = other_fact.OtherFactories.create_galaxy(test_mock, cur_quad)
+    game_var = game.Game(galaxy, test_mock, cur_quad)
 
+    result = game_var.nav(5, 1)
 
-    curQuad = cqf.CurrentQuadrantFactory()
-    galaxy = otherFact.otherFactories.createGalaxy(testMock, curQuad)
-    gameVar = game.Game(galaxy, testMock, curQuad)
+    assert result.command == Commands.NAV
+    assert result.command_result == CommandResult.ERROR
+    assert result.nav.nav_message == NavMessage.BAD_INPUT_OUTSIDE_GALAXY
 
 
-    result = gameVar.nav(3,1)
+def test_nav_outside_galaxy_bottom():
+    test_mock = create_random_factory(bottom_right=True)
 
+    cur_quad = cqf.CurrentQuadrantFactory()
+    galaxy = other_fact.OtherFactories.create_galaxy(test_mock, cur_quad)
+    game_var = game.Game(galaxy, test_mock, cur_quad)
 
-    assert result.Command == Commands.NAV
-    assert result.CommandResult == CommandResult.Error
-    assert result.NAV.NavMessage == NavMessage.BadInput_OutsideGalaxy
+    result = game_var.nav(7, 1)
 
-def test_NAV_OutsideGalaxy_Left():
-    testMock = create_random_factory()
+    assert result.command == Commands.NAV
+    assert result.command_result == CommandResult.ERROR
+    assert result.nav.nav_message == NavMessage.BAD_INPUT_OUTSIDE_GALAXY
 
 
+def test_nav_outside_galaxy_right():
+    test_mock = create_random_factory(bottom_right=True)
 
-    curQuad = cqf.CurrentQuadrantFactory()
-    galaxy = otherFact.otherFactories.createGalaxy(testMock, curQuad)
-    gameVar = game.Game(galaxy, testMock, curQuad)
+    cur_quad = cqf.CurrentQuadrantFactory()
+    galaxy = other_fact.OtherFactories.create_galaxy(test_mock, cur_quad)
+    game_var = game.Game(galaxy, test_mock, cur_quad)
 
+    result = game_var.nav(1, 1)
 
-    result = gameVar.nav(5,1)
+    assert result.command == Commands.NAV
+    assert result.command_result == CommandResult.ERROR
+    assert result.nav.nav_message == NavMessage.BAD_INPUT_OUTSIDE_GALAXY
 
 
-    assert result.Command == Commands.NAV
-    assert result.CommandResult == CommandResult.Error
-    assert result.NAV.NavMessage == NavMessage.BadInput_OutsideGalaxy
+def test_nav_not_enough_energy_shield_avail():
+    test_mock = create_random_factory()
 
-def test_NAV_OutsideGalaxy_Bottom():
-    testMock = create_random_factory(bottom_right=True)
+    cur_quad = cqf.CurrentQuadrantFactory()
+    galaxy = other_fact.OtherFactories.create_galaxy(test_mock, cur_quad)
+    game_var = game.Game(galaxy, test_mock, cur_quad)
+    game_var.galaxy.starship.energy_level = 10
+    game_var.galaxy.starship.shield_level = 1000
 
+    result = game_var.nav(1, 1)
 
+    assert result.command_result == CommandResult.ERROR
+    assert result.nav.nav_message == NavMessage.INSUFFICIENT_ENERGY_SHIELD_ENERGY_AVAILABLE
 
-    curQuad = cqf.CurrentQuadrantFactory()
-    galaxy = otherFact.otherFactories.createGalaxy(testMock, curQuad)
-    gameVar = game.Game(galaxy, testMock, curQuad)
 
+def test_nav_not_enough_energy():
+    test_mock = create_random_factory()
 
-    result = gameVar.nav(7,1)
+    cur_quad = cqf.CurrentQuadrantFactory()
+    galaxy = other_fact.OtherFactories.create_galaxy(test_mock, cur_quad)
+    game_var = game.Game(galaxy, test_mock, cur_quad)
+    game_var.galaxy.starship.energy_level = 10
+    game_var.galaxy.starship.shield_level = 0
 
+    result = game_var.nav(1, 1)
 
-    assert result.Command == Commands.NAV
-    assert result.CommandResult == CommandResult.Error
-    assert result.NAV.NavMessage == NavMessage.BadInput_OutsideGalaxy
+    assert result.command_result == CommandResult.ERROR
+    assert result.nav.nav_message == NavMessage.INSUFFICIENT_ENERGY
 
-def test_NAV_OutsideGalaxy_Right():
-    testMock = create_random_factory(bottom_right=True)
 
+def test_nav_object_in_way():
+    test_mock = create_random_factory(object_in_way=True)
 
+    cur_quad = cqf.CurrentQuadrantFactory()
+    galaxy = other_fact.OtherFactories.create_galaxy(test_mock, cur_quad)
+    game_var = game.Game(galaxy, test_mock, cur_quad)
+    print(game_var.get_current_quadrant_formatted())
 
-    curQuad = cqf.CurrentQuadrantFactory()
-    galaxy = otherFact.otherFactories.createGalaxy(testMock, curQuad)
-    gameVar = game.Game(galaxy, testMock, curQuad)
+    result = game_var.nav(1, 7)
 
+    assert result.command_result == CommandResult.ERROR
+    assert result.nav.nav_message == NavMessage.BAD_INPUT_OBJECT_HIT
+    assert result.nav.distance_traveled != 0
 
-    result = gameVar.nav(1,1)
 
+def test_nav_damaged_good_inside_quadrant():
+    test_mock = create_random_factory()
 
-    assert result.Command == Commands.NAV
-    assert result.CommandResult == CommandResult.Error
-    assert result.NAV.NavMessage == NavMessage.BadInput_OutsideGalaxy
+    cur_quad = cqf.CurrentQuadrantFactory()
+    galaxy = other_fact.OtherFactories.create_galaxy(test_mock, cur_quad)
+    game_var = game.Game(galaxy, test_mock, cur_quad)
+    game_var.galaxy.starship.get_device(DeviceType.NAV).damage_level = -3
+    print(game_var.get_current_quadrant_formatted())
 
-def test_NAV_NotEnoughEnergy_ShieldAvail():
-    testMock = create_random_factory()
+    result = game_var.nav(1, 0.1)
 
+    assert result.command_result == CommandResult.OK
+    assert result.nav.nav_message == NavMessage.TRANSIT_COMPLETE
+    assert result.nav.distance_traveled != 0
+    assert game_var.galaxy.starship.energy_level != gbl.MAX_STARSHIP_ENERGY
 
 
-    curQuad = cqf.CurrentQuadrantFactory()
-    galaxy = otherFact.otherFactories.createGalaxy(testMock, curQuad)
-    gameVar = game.Game(galaxy, testMock, curQuad)
-    gameVar.galaxy.Starship.energyLevel = 10
-    gameVar.galaxy.Starship.shieldLevel = 1000
+def test_nav_damaged_good_different_quadrant():
+    test_mock = create_random_factory(quadrant_visits=2)
 
-    result = gameVar.nav(1,1)
+    cur_quad = cqf.CurrentQuadrantFactory()
+    galaxy = other_fact.OtherFactories.create_galaxy(test_mock, cur_quad)
+    game_var = game.Game(galaxy, test_mock, cur_quad)
+    print(game_var.get_current_quadrant_formatted())
 
-    assert result.CommandResult == CommandResult.Error
-    assert result.NAV.NavMessage == NavMessage.InsufficientEnergy_ShieldEnergyAvailable
+    result = game_var.nav(1, 7)
 
-def test_NAV_NotEnoughEnergy():
-    testMock = create_random_factory()
+    assert result.command_result == CommandResult.OK
+    assert result.nav.nav_message == NavMessage.TRANSIT_COMPLETE
+    assert result.nav.distance_traveled != 0
+    assert game_var.galaxy.starship.energy_level != gbl.MAX_STARSHIP_ENERGY
 
 
+def test_nav_verify_starship_sector():
+    test_mock = create_random_factory()
 
-    curQuad = cqf.CurrentQuadrantFactory()
-    galaxy = otherFact.otherFactories.createGalaxy(testMock, curQuad)
-    gameVar = game.Game(galaxy, testMock, curQuad)
-    gameVar.galaxy.Starship.energyLevel = 10
-    gameVar.galaxy.Starship.shieldLevel = 0
+    cur_quad = cqf.CurrentQuadrantFactory()
+    galaxy = other_fact.OtherFactories.create_galaxy(test_mock, cur_quad)
+    game_var = game.Game(galaxy, test_mock, cur_quad)
+    print(game_var.get_current_quadrant_formatted())
 
-    result = gameVar.nav(1,1)
-
-    assert result.CommandResult == CommandResult.Error
-    assert result.NAV.NavMessage == NavMessage.InsufficientEnergy
-
-def test_NAV_ObjectInWay():
-    testMock = create_random_factory(object_in_way=True)
-
-
-    curQuad = cqf.CurrentQuadrantFactory()
-    galaxy = otherFact.otherFactories.createGalaxy(testMock, curQuad)
-    gameVar = game.Game(galaxy, testMock, curQuad)
-    print(gameVar.getCurrentQuadrantFormatted())
-
-
-    result = gameVar.nav(1,7)
-
-    assert result.CommandResult == CommandResult.Error
-    assert result.NAV.NavMessage == NavMessage.BadInput_ObjectHit
-    assert result.NAV.DistanceTraveled != 0
-
-def test_NAV_Damaged_Good_InsideQuadrant():
-    testMock = create_random_factory()
-
-
-    curQuad = cqf.CurrentQuadrantFactory()
-    galaxy = otherFact.otherFactories.createGalaxy(testMock, curQuad)
-    gameVar = game.Game(galaxy, testMock, curQuad)
-    gameVar.galaxy.Starship.GetDevice(eDevice.NAV).damageLevel = -3
-    print(gameVar.getCurrentQuadrantFormatted())
-
-
-    result = gameVar.nav(1,.1)
-
-
-    assert result.CommandResult == CommandResult.OK
-    assert result.NAV.NavMessage == NavMessage.TransitComplete
-    assert result.NAV.DistanceTraveled != 0
-    assert gameVar.galaxy.Starship.energyLevel != gbl.MAX_STARSHIP_ENERGY
-
-def test_NAV_Damaged_Good_DifferentQuadrant():
-    testMock = create_random_factory(quadrant_visits=2)
-
-
-    curQuad = cqf.CurrentQuadrantFactory()
-    galaxy = otherFact.otherFactories.createGalaxy(testMock, curQuad)
-    gameVar = game.Game(galaxy, testMock, curQuad)
-    print(gameVar.getCurrentQuadrantFormatted())
-
-
-    result = gameVar.nav(1,7)
-
-
-    assert result.CommandResult == CommandResult.OK
-    assert result.NAV.NavMessage == NavMessage.TransitComplete
-    assert result.NAV.DistanceTraveled != 0
-    assert gameVar.galaxy.Starship.energyLevel != gbl.MAX_STARSHIP_ENERGY
-
-def test_NAV_VerifyStarshipSector():
-    testMock = create_random_factory()
-
-
-    curQuad = cqf.CurrentQuadrantFactory()
-    galaxy = otherFact.otherFactories.createGalaxy(testMock, curQuad)
-    gameVar = game.Game(galaxy, testMock, curQuad)
-    print(gameVar.getCurrentQuadrantFormatted())
-
-
-    result = gameVar.nav(1,0.5)
+    result = game_var.nav(1, 0.5)
 
     assert result is not None
-    assert gameVar.galaxy.GetStarshipSector().coord.x == 4
-    assert gameVar.galaxy.GetStarshipSector().coord.y == 0
-
-def test_NAV_VerifyLocationAfterWarp1():
-    testMock = create_random_factory(quadrant_visits=2)
+    assert game_var.galaxy.get_starship_sector().coord.x == 4
+    assert game_var.galaxy.get_starship_sector().coord.y == 0
 
 
-    curQuad = cqf.CurrentQuadrantFactory()
-    galaxy = otherFact.otherFactories.createGalaxy(testMock, curQuad)
-    gameVar = game.Game(galaxy, testMock, curQuad)
-    print(gameVar.getCurrentQuadrantFormatted())
+def test_nav_verify_location_after_warp1():
+    test_mock = create_random_factory(quadrant_visits=2)
 
+    cur_quad = cqf.CurrentQuadrantFactory()
+    galaxy = other_fact.OtherFactories.create_galaxy(test_mock, cur_quad)
+    game_var = game.Game(galaxy, test_mock, cur_quad)
+    print(game_var.get_current_quadrant_formatted())
 
-    result = gameVar.nav(1,1)
-
+    result = game_var.nav(1, 1)
 
     assert result is not None
-    assert gameVar.galaxy.GetStarshipSector().coord.x == 0
-    assert gameVar.galaxy.GetStarshipSector().coord.y == 0
-    assert gameVar.galaxy.CurrentQuadrant.coord.x == 1
-    assert gameVar.galaxy.CurrentQuadrant.coord.y == 0
-
-def test_NAV_VerifyLocationAfterWarp1Point1():
-    testMock = create_random_factory(quadrant_visits=2)
+    assert game_var.galaxy.get_starship_sector().coord.x == 0
+    assert game_var.galaxy.get_starship_sector().coord.y == 0
+    assert game_var.galaxy.current_quadrant.coord.x == 1
+    assert game_var.galaxy.current_quadrant.coord.y == 0
 
 
-    curQuad = cqf.CurrentQuadrantFactory()
-    galaxy = otherFact.otherFactories.createGalaxy(testMock, curQuad)
-    gameVar = game.Game(galaxy, testMock, curQuad)
-    print(gameVar.getCurrentQuadrantFormatted())
+def test_nav_verify_location_after_warp1_point1():
+    test_mock = create_random_factory(quadrant_visits=2)
 
+    cur_quad = cqf.CurrentQuadrantFactory()
+    galaxy = other_fact.OtherFactories.create_galaxy(test_mock, cur_quad)
+    game_var = game.Game(galaxy, test_mock, cur_quad)
+    print(game_var.get_current_quadrant_formatted())
 
-    result = gameVar.nav(1,1.1)
-
+    result = game_var.nav(1, 1.1)
 
     assert result is not None
-    assert gameVar.galaxy.GetStarshipSector().coord.x == 1
-    assert gameVar.galaxy.GetStarshipSector().coord.y == 0
-    assert gameVar.galaxy.CurrentQuadrant.coord.x == 1
-    assert gameVar.galaxy.CurrentQuadrant.coord.y == 0
+    assert game_var.galaxy.get_starship_sector().coord.x == 1
+    assert game_var.galaxy.get_starship_sector().coord.y == 0
+    assert game_var.galaxy.current_quadrant.coord.x == 1
+    assert game_var.galaxy.current_quadrant.coord.y == 0

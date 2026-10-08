@@ -21,7 +21,7 @@ while porting the game and writing unit tests.
 
 IntelliJ IDEA and VS Code are optional. The game runs from the command line.
 The game uses Python's standard library; the packages in
-`requirements-dev.txt` are for running the tests.
+`requirements-dev.txt` are for running the tests and checking code style.
 
 ## Setup
 
@@ -114,7 +114,7 @@ $testLog = "pytest-$(Get-Date -Format 'yyyyMMdd-HHmmss').txt"
 
 Add `-s` to include debug `print()` output. Add `-x` to stop at the first
 failure. Run a single file by adding its path, for example
-`tests\test_library\test_routineMaint.py`.
+`tests\test_library\test_routine_maint.py`.
 
 The suite exercises game calculations, command handling, combat,
 maintenance, and factory behavior. Tests use configurable deterministic
@@ -128,7 +128,30 @@ factory.
 - `source/library/`: game logic, models, factories, and calculation utilities.
 - `source/gbl.py`: shared constants and configuration values.
 - `tests/`: CLI and game-library tests, plus deterministic factory helpers.
-- `requirements-dev.txt`: pinned test dependencies.
+- `requirements-dev.txt`: pinned test and code-style dependencies.
+- `pyproject.toml`: Ruff formatting and lint configuration.
+
+## Code Style
+
+Modules, functions, methods, and variables use `snake_case`; classes use
+`PascalCase`; constants and enum members use `UPPER_SNAKE_CASE`. Game commands
+such as `NAV`, `LAS`, and `COM STA` are unchanged.
+
+Check formatting and lint without changing source files:
+
+```powershell
+.\.venv\Scripts\python.exe -m ruff format --check source tests run_game.py
+.\.venv\Scripts\python.exe -m ruff check source tests run_game.py
+```
+
+To apply formatting:
+
+```powershell
+.\.venv\Scripts\python.exe -m ruff format source tests run_game.py
+```
+
+Then review the diff and run the tests. See
+[the test factory examples](tests/random_factory_builder.md) for the helper API.
 
 ## Current Limitations
 
@@ -154,5 +177,5 @@ Copyright (c) 2026 Rob. This project's original code is licensed under the
 commercially, subject to the license's terms. The software is provided without
 warranty.
 
-Test dependencies are listed in `requirements-dev.txt`; their own licenses
+Development dependencies are listed in `requirements-dev.txt`; their own licenses
 remain applicable to those packages.

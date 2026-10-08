@@ -14,5 +14,5 @@ class Commands(Enum):
     COM_STB = 9
     COM_NAV = 10
     COM_TOR = 11
-    MaintResult = 12
-    Empty = 13
+    MAINT_RESULT = 12
+    EMPTY = 13

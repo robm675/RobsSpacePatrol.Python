@@ -10,6 +10,5 @@ class Coord:
         self.x = x
         self.y = y
 
-    def ToString(self) -> str :
+    def to_string(self) -> str:
         return f"({self.x},{self.y})"
-

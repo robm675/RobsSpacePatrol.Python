@@ -1,7 +1,3 @@
-import uuid
-
-
 class Enemy:
-    def __init__(self, shieldLevel: int):
-        id = uuid.uuid4
-        self.shieldLevel = shieldLevel
+    def __init__(self, shield_level: int):
+        self.shield_level = shield_level
