@@ -1,0 +1,12 @@
+{
+  "include": [
+    "source",
+    "tests"
+  ],
+  "extraPaths": [
+    "source",
+    "source/library",
+    "source/library/factories"
+  ],
+  "typeCheckingMode": "basic"
+}
